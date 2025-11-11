@@ -1,0 +1,13 @@
+<<<<<<< HEAD
+<?php
+
+return [
+    "" => "Yes"
+];
+=======
+<?php
+
+return [
+    "" => "Yes"
+];
+>>>>>>> dev

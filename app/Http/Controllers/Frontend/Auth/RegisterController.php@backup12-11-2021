@@ -1,0 +1,809 @@
+<<<<<<< HEAD
+<?php
+
+namespace App\Http\Controllers\Frontend\Auth;
+
+use App\Events\Frontend\UniqueCheck\UniqueCheckEvent;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Frontend\Auth\ContactRequest;
+use App\Http\Requests\PromoRegisterRequest;
+use App\Http\Requests\RegisterRequest;
+use App\Helpers\Frontend\Auth\Socialite;
+use App\Events\Frontend\Auth\UserRegistered;
+use App\Listeners\Inpanel\ReferralManage;
+use App\Models\Affiliate\AffiliateCampaign;
+use App\Models\Affiliate\AffiliateCampaignData;
+use App\Models\Affiliate\AffiliateList;
+use App\Models\Auth\User;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Foundation\Auth\RegistersUsers;
+use App\Repositories\Frontend\Auth\UserRepository;
+use App\Repositories\Inpanel\General\GeneralRepository;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Config;
+use phpDocumentor\Reflection\DocBlock\Tags\Source;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
+
+
+/**
+ * This class is used for handling registration process of both normal and promo link customers.
+ *
+ * Class RegisterController
+ * @author Pankaj Jha
+ * @author Akash Sharma
+ * @access public
+ * @package  App\Http\Controllers\Frontend\Auth\RegisterController
+ */
+
+class RegisterController extends Controller
+{
+    use RegistersUsers;
+
+    /**
+     * @var UserRepository
+     */
+    protected $userRepository, $generalRepository;
+
+    /**
+     * RegisterController constructor.
+     *
+     * @param UserRepository $userRepository
+     */
+    public function __construct(UserRepository $userRepository, GeneralRepository $generalRepository)
+    {
+        $this->userRepository = $userRepository;
+        $this->generalRepository = $generalRepository;
+    }
+
+    /**
+     * Where to redirect users after login.
+     *
+     * @return string
+     */
+    public function redirectPath()
+    {
+        return route(home_route());
+    }
+
+    /**
+     * This function is used to Show the application registration form.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function showRegistrationForm(Request $request)
+    {
+
+        $sjtest = $request->input('sjtest',false);
+        Cookie::queue('sjtest',$sjtest);
+        $user_group = $request->input('user_group',false);
+        Cookie::queue('user_group',$user_group);
+        abort_unless(config('access.registration'), 404);
+        $geodata = geoip(request()->ip());
+        $ipcountryCode = $geodata->getAttribute('iso_code');
+        /*Todo for $countries as withTranslation() function is not working*/
+        $countries = $this->generalRepository->getActiveCountries();
+        return view('frontend.auth.register')
+            ->withSocialiteLinks((new Socialite)->getSocialLinks())
+            ->withCurrentCountry($ipcountryCode)
+            ->withCountries($countries);
+    }
+
+    /**
+     * This function is used to register new user and if the user is from invite links than invite details will be updated in user additional data
+     * and than registration of this user will be done.
+     *
+     * @param RegisterRequest $request
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     * @throws \Throwable
+     */
+    public function register(RegisterRequest $request)
+    {
+       
+        abort_unless(config('access.registration'), 404);
+
+        //$geoip = geoip(request()->ip());
+        $con = $request->input('country',false);
+        if($con=='US'){
+        $ip='206.223.192.11';
+          $geoip = geoip($ip);
+        }else{
+            $geoip = geoip(request()->ip());
+        }
+        $current_ip =  $geoip->getAttribute('ip');
+        //$this->checkProxy($request);
+        //$this->ipDClassCheck($current_ip);
+        $input = $request->only('dob');
+        $date = Carbon::parse($input['dob'])->format('Y-m-d');
+        $request->merge(['dob' => $date]);
+        $lang = $request->input('language',false);
+        
+
+        /*
+        * Check Selected Country with Geo Location Check- Starts
+        * Get Client's country and lattitue/longitue from there IP and validate with User's 
+        * Provided country
+        */
+        $ipcountryCode = $geoip->getAttribute('iso_code');
+        /*$lat = $geoip->getAttribute('lat');
+        $lon = $geoip->getAttribute('lon');*/
+        
+        if($con && $con != $ipcountryCode)
+        {            
+            throw ValidationException::withMessages([
+                $con => [trans('auth.countryLocationFraud')],
+            ]);
+            return false;
+        }
+        /* Check Selected Country with Geo Location Check- Ends */
+
+        /*$sjtest = "";
+        if($request->hasCookie('sjtest')){
+            $sjtest = Cookie::get('sjtest');
+        }*/
+        $unique_ip_check = setting()->get('unique_ip_check');
+        
+        //$current_ip = $geoip; //$request->ip();
+        //$users_data = User::all()->toArray();
+        $ip_matched = false;
+        $row = [];
+        if(file_exists(resource_path().DIRECTORY_SEPARATOR."blacklisted_ips".DIRECTORY_SEPARATOR."blacklisted_ips.csv")){
+            $link_file = fopen(resource_path().DIRECTORY_SEPARATOR."blacklisted_ips".DIRECTORY_SEPARATOR."blacklisted_ips.csv",'r');
+            while (($line = fgetcsv($link_file)) !== FALSE) {
+                $row[] = $line;
+            }
+            unset($row[0]);
+        }
+        $ip_array = array_values($row);
+        $blacklisted_ips = [];
+        foreach($ip_array as $val){
+            $blacklisted_ips[] = $val[0];
+        }
+        /*if($sjtest==0 || $sjtest==""){
+            foreach ($users_data as $index=>$value){
+                if($value['last_login_ip'] == $current_ip || in_array($current_ip,$blacklisted_ips)){
+                    $ip_matched = true;
+                }
+            }
+            if($unique_ip_check && $ip_matched){
+                return view('frontend.index')
+                    ->withErrors(__('frontend.register.static.messages.ip_check'));
+            }
+        }*/
+        $locales = [
+            'locale' => strtolower($lang).'_'.$con
+        ];
+        $register_input_data = $request->only('first_name', 'middle_name', 'last_name', 'email', 'password', 'gender', 'consent','dob','country');
+        $updated_register_data = array_merge($register_input_data, $locales);
+        $user = $this->userRepository->create($updated_register_data);
+        $check_invite_cookie = $this->userRepository->checkInviteCookieCode();
+        if($check_invite_cookie){
+            $this->userRepository->giveUserInvitePoints($check_invite_cookie,$user);
+        }
+        event(new UserRegistered($user,$register_input_data));
+        // If the user must confirm their email or their account requires approval,
+        // create the account but don't log them in.
+        if (config('access.users.confirm_email') || config('access.users.requires_approval')) {
+                activity()
+                ->causedBy($user)
+                ->log('inpanel.activity_log.registration');
+            return view('frontend.auth.confirmation_sent_page')->withFlashSuccess(
+                config('access.users.requires_approval') ?
+                    __('exceptions.frontend.auth.confirmation.created_pending') :
+                    __('exceptions.frontend.auth.confirmation.created_confirm')
+            );
+        } else {
+            auth()->login($user);
+            return redirect($this->redirectPath());
+        }
+    }
+
+
+    /**
+     * Attempt to check the client's proxy, vpn or tor network
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return bool
+     */
+    protected function checkProxy(Request $request)
+    {
+        $key = 'Jaxm7e3Msbmj74a19Uay0ZI0uhws4p7H';
+        $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : $_SERVER['HTTP_CLIENT_IP'];
+
+        $strictness = 1;
+        $result = json_decode(file_get_contents(sprintf('https://ipqualityscore.com/api/json/ip/%s/%s?strictness=%s', $key, $ip, $strictness)), true);
+
+        // Remove $ip condition from below on production
+        if($result !== null && $ip!='127.0.0.1'){ 
+            if($result['vpn'] || $result['tor']){
+                //exit("Please disable your proxy connection!");            
+                throw ValidationException::withMessages([
+                    $request->first_name => [trans('auth.proxyFraud')],
+                ]);
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Attempt to check the similar Ip's D class check
+     *
+     * @return bool
+     */
+    protected function ipDClassCheck($ip)
+    {
+        $abcClass = substr($ip, 0, strrpos($ip, "."));
+        $Dclass = substr($ip, strrpos($ip, ".")+1);
+        $repeatIPCnt='';
+        $info = DB::select("SELECT SUBSTRING_INDEX(ip_registered_with, '.', 3) AS abc_Class 
+            ,COUNT(SUBSTRING_INDEX(ip_registered_with, '.', 3)) AS abc_Class_cnt 
+            ,group_concat(id)
+            ,group_concat(ip_registered_with)
+            FROM users
+            WHERE deleted_at IS NULL
+            AND SUBSTRING_INDEX(ip_registered_with, '.', 3) = '$abcClass'
+            AND SUBSTRING_INDEX(ip_registered_with, '.', -1) != '$Dclass'
+            GROUP BY SUBSTRING_INDEX(ip_registered_with, '.', 3) ");
+
+        $uniqueIpCheck = DB::select("SELECT COUNT(id) AS cnt FROM users WHERE ip_registered_with = '$ip' ")[0];
+
+        if(isset($info[0]))
+        {
+            $repeatIPCnt = $info[0]->abc_Class_cnt;
+            if($repeatIPCnt >= 2)
+            {
+                throw ValidationException::withMessages([
+                    $ip.'-Dclass-fraud' => [trans('auth.repeatedIPFraudRegister')],
+                ]);
+            } 
+        }
+        if($uniqueIpCheck->cnt > 0)
+        {
+            throw ValidationException::withMessages([
+                $ip.'-unique-ip-fraud' => [trans('auth.repeatedIPFraudRegister')],
+            ]);
+        }
+        
+        return true;
+    }
+
+    /**
+     * Shows the application consentual information page that redirects a user to registration page of promo.
+     *
+     * @param Request $request
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function showPromoConsentPage(Request $request)
+    {
+        $request_data = $request->query();
+
+
+        return view('frontend.auth.promo_consent');
+            /* ->withSocialiteLinks((new Socialite)->getSocialLinks())
+            ->withCurrentCountry($ipcountryCode)
+            ->withCountries($countries)
+            ->with('con_code',$country_code)
+            ->with('lang_code',$lang_code);*/
+    }
+
+    /**
+     * Show the application registration form that are redirected by Promo Landing and saving the affiliate_data.
+     *
+     * @param Request $request
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function showPromoRegistrationForm(Request $request)
+    {
+        $geodata = geoip(request()->ip()); //geoip(request()->ip());
+
+        $request_data = $request->query();
+        $country_code = $request->input('con',$geodata->iso_code);
+        $lang_code = $request->input('lang',false);
+        $user_group = $request->input('user_group',false);
+        Cookie::queue('user_group',$user_group);
+        $cookie_data = $request->only(['utm_campaign', 'utm_source', 'utm_medium', 'utm_content']);
+        if (!empty($cookie_data) && !empty($cookie_data['utm_source'])) {
+            $aff = AffiliateList::where('code', '=', $cookie_data['utm_source'])->first(['aff_vars']);
+            $aff_vars = explode(',', $aff->aff_vars);
+            $varsData = $request->only($aff_vars);
+            $cookie_data = array_merge($cookie_data, $varsData);
+        }
+        Cookie::queue('affiliate_data', json_encode($cookie_data));
+        abort_unless(config('access.registration'), 404);
+        $geodata = geoip(request()->ip());
+        $ipcountryCode = $geodata->getAttribute('iso_code');
+        /*Todo for $countries as withTranslation() function is not working*/
+        $countries = $this->generalRepository->getActiveCountries();
+        return view('frontend.auth.promo_register')
+            ->withSocialiteLinks((new Socialite)->getSocialLinks())
+            ->withCurrentCountry($ipcountryCode)
+            ->withCountries($countries)
+            ->with('con_code',$country_code)
+            ->with('lang_code',$lang_code);
+    }
+
+    /**
+     * Registration for Promo Landing Users.
+     *
+     * @param PromoRegisterRequest $request
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     * @throws \Throwable
+     */
+
+    public function postPromoRegister(PromoRegisterRequest $request)
+    {
+        abort_unless(config('access.registration'), 404);
+        $check_affiliate_cookie = $this->userRepository->checkAffiliateCookie();
+        $lang = $request->input('language',false);
+        $con = $request->input('country',false);
+        $locales = [
+            'locale' => strtolower($lang).'_'.$con
+        ];
+        $register_input_data = $request->only('first_name', 'last_name', 'email', 'consent','password','country');
+        if($request->hasCookie('user_group')){
+            $user_group = Cookie::get('user_group');
+            $register_input_data['user_group'] = $user_group;
+        }
+        $updated_register_data = array_merge($register_input_data, $locales);
+        $user = $this->userRepository->create($updated_register_data);
+        $check_invite_cookie = $this->userRepository->checkInviteCookieCode();
+        if($check_invite_cookie){
+            $this->userRepository->giveUserInvitePoints($check_invite_cookie,$user);
+        }
+        if( !empty($check_affiliate_cookie) ) {
+            $cookie_data = json_decode($check_affiliate_cookie);
+            $this->userRepository->createAffiliateCampData($cookie_data, $user);
+        }
+        event(new UserRegistered($user, $updated_register_data));
+        // If the user must confirm their email or their account requires approval,
+        // create the account but don't log them in.
+        if (config('access.users.confirm_email') || config('access.users.requires_approval')) {
+            activity()
+                ->causedBy($user)
+                ->log('inpanel.activity_log.registration');
+            return view('frontend.auth.confirmation_sent_page')->withFlashSuccess(
+                config('access.users.requires_approval') ?
+                    __('exceptions.frontend.auth.confirmation.created_pending') :
+                    __('exceptions.frontend.auth.confirmation.created_confirm')
+            );
+        } else {
+            auth()->login($user);
+            return redirect($this->redirectPath());
+        }
+    }
+
+    public function getCountryLanguage(Request $request)
+    {
+        $country_code = $request->country_code;
+        $language = $this->userRepository->getCountry($country_code);
+        return response()->json($language);
+    }
+
+    public function complete2FARegister(Request $request)
+    {
+        $user = $request->user;
+        $request->merge(session('registration_data'));
+
+        // Call the default laravel authentication
+
+        return $this->registerTwoFactorAuth($user,$request);
+    }
+
+    private function registerTwoFactorAuth($user,$data)
+    {
+        $user->google2fa_secret = $data->google2fa_secret;
+        $user->save();
+        return redirect()->route('frontend.auth.logout')
+            ->withFlashSuccess('Successfully updated Two Factor Authentication');
+    }
+}
+=======
+<?php
+
+namespace App\Http\Controllers\Frontend\Auth;
+
+use App\Events\Frontend\UniqueCheck\UniqueCheckEvent;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Frontend\Auth\ContactRequest;
+use App\Http\Requests\PromoRegisterRequest;
+use App\Http\Requests\RegisterRequest;
+use App\Helpers\Frontend\Auth\Socialite;
+use App\Events\Frontend\Auth\UserRegistered;
+use App\Listeners\Inpanel\ReferralManage;
+use App\Models\Affiliate\AffiliateCampaign;
+use App\Models\Affiliate\AffiliateCampaignData;
+use App\Models\Affiliate\AffiliateList;
+use App\Models\Auth\User;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Foundation\Auth\RegistersUsers;
+use App\Repositories\Frontend\Auth\UserRepository;
+use App\Repositories\Inpanel\General\GeneralRepository;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Config;
+use phpDocumentor\Reflection\DocBlock\Tags\Source;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
+
+
+/**
+ * This class is used for handling registration process of both normal and promo link customers.
+ *
+ * Class RegisterController
+ * @author Pankaj Jha
+ * @author Akash Sharma
+ * @access public
+ * @package  App\Http\Controllers\Frontend\Auth\RegisterController
+ */
+
+class RegisterController extends Controller
+{
+    use RegistersUsers;
+
+    /**
+     * @var UserRepository
+     */
+    protected $userRepository, $generalRepository;
+
+    /**
+     * RegisterController constructor.
+     *
+     * @param UserRepository $userRepository
+     */
+    public function __construct(UserRepository $userRepository, GeneralRepository $generalRepository)
+    {
+        $this->userRepository = $userRepository;
+        $this->generalRepository = $generalRepository;
+    }
+
+    /**
+     * Where to redirect users after login.
+     *
+     * @return string
+     */
+    public function redirectPath()
+    {
+        return route(home_route());
+    }
+
+    /**
+     * This function is used to Show the application registration form.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function showRegistrationForm(Request $request)
+    {
+
+        $sjtest = $request->input('sjtest',false);
+        Cookie::queue('sjtest',$sjtest);
+        $user_group = $request->input('user_group',false);
+        Cookie::queue('user_group',$user_group);
+        abort_unless(config('access.registration'), 404);
+        $geodata = geoip(request()->ip());
+        $ipcountryCode = $geodata->getAttribute('iso_code');
+        /*Todo for $countries as withTranslation() function is not working*/
+        $countries = $this->generalRepository->getActiveCountries();
+        return view('frontend.auth.register')
+            ->withSocialiteLinks((new Socialite)->getSocialLinks())
+            ->withCurrentCountry($ipcountryCode)
+            ->withCountries($countries);
+    }
+
+    /**
+     * This function is used to register new user and if the user is from invite links than invite details will be updated in user additional data
+     * and than registration of this user will be done.
+     *
+     * @param RegisterRequest $request
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     * @throws \Throwable
+     */
+    public function register(RegisterRequest $request)
+    {
+       
+        abort_unless(config('access.registration'), 404);
+
+        //$geoip = geoip(request()->ip());
+        $con = $request->input('country',false);
+        if($con=='US'){
+        $ip='206.223.192.11';
+          $geoip = geoip($ip);
+        }else{
+            $geoip = geoip(request()->ip());
+        }
+        $current_ip =  $geoip->getAttribute('ip');
+        //$this->checkProxy($request);
+        //$this->ipDClassCheck($current_ip);
+        $input = $request->only('dob');
+        $date = Carbon::parse($input['dob'])->format('Y-m-d');
+        $request->merge(['dob' => $date]);
+        $lang = $request->input('language',false);
+        
+
+        /*
+        * Check Selected Country with Geo Location Check- Starts
+        * Get Client's country and lattitue/longitue from there IP and validate with User's 
+        * Provided country
+        */
+        $ipcountryCode = $geoip->getAttribute('iso_code');
+        /*$lat = $geoip->getAttribute('lat');
+        $lon = $geoip->getAttribute('lon');*/
+        
+        if($con && $con != $ipcountryCode)
+        {            
+            throw ValidationException::withMessages([
+                $con => [trans('auth.countryLocationFraud')],
+            ]);
+            return false;
+        }
+        /* Check Selected Country with Geo Location Check- Ends */
+
+        /*$sjtest = "";
+        if($request->hasCookie('sjtest')){
+            $sjtest = Cookie::get('sjtest');
+        }*/
+        $unique_ip_check = setting()->get('unique_ip_check');
+        
+        //$current_ip = $geoip; //$request->ip();
+        //$users_data = User::all()->toArray();
+        $ip_matched = false;
+        $row = [];
+        if(file_exists(resource_path().DIRECTORY_SEPARATOR."blacklisted_ips".DIRECTORY_SEPARATOR."blacklisted_ips.csv")){
+            $link_file = fopen(resource_path().DIRECTORY_SEPARATOR."blacklisted_ips".DIRECTORY_SEPARATOR."blacklisted_ips.csv",'r');
+            while (($line = fgetcsv($link_file)) !== FALSE) {
+                $row[] = $line;
+            }
+            unset($row[0]);
+        }
+        $ip_array = array_values($row);
+        $blacklisted_ips = [];
+        foreach($ip_array as $val){
+            $blacklisted_ips[] = $val[0];
+        }
+        /*if($sjtest==0 || $sjtest==""){
+            foreach ($users_data as $index=>$value){
+                if($value['last_login_ip'] == $current_ip || in_array($current_ip,$blacklisted_ips)){
+                    $ip_matched = true;
+                }
+            }
+            if($unique_ip_check && $ip_matched){
+                return view('frontend.index')
+                    ->withErrors(__('frontend.register.static.messages.ip_check'));
+            }
+        }*/
+        $locales = [
+            'locale' => strtolower($lang).'_'.$con
+        ];
+        $register_input_data = $request->only('first_name', 'middle_name', 'last_name', 'email', 'password', 'gender', 'consent','dob','country');
+        $updated_register_data = array_merge($register_input_data, $locales);
+        $user = $this->userRepository->create($updated_register_data);
+        $check_invite_cookie = $this->userRepository->checkInviteCookieCode();
+        if($check_invite_cookie){
+            $this->userRepository->giveUserInvitePoints($check_invite_cookie,$user);
+        }
+        event(new UserRegistered($user,$register_input_data));
+        // If the user must confirm their email or their account requires approval,
+        // create the account but don't log them in.
+        if (config('access.users.confirm_email') || config('access.users.requires_approval')) {
+                activity()
+                ->causedBy($user)
+                ->log('inpanel.activity_log.registration');
+            return view('frontend.auth.confirmation_sent_page')->withFlashSuccess(
+                config('access.users.requires_approval') ?
+                    __('exceptions.frontend.auth.confirmation.created_pending') :
+                    __('exceptions.frontend.auth.confirmation.created_confirm')
+            );
+        } else {
+            auth()->login($user);
+            return redirect($this->redirectPath());
+        }
+    }
+
+
+    /**
+     * Attempt to check the client's proxy, vpn or tor network
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return bool
+     */
+    protected function checkProxy(Request $request)
+    {
+        $key = 'Jaxm7e3Msbmj74a19Uay0ZI0uhws4p7H';
+        $ip = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : $_SERVER['HTTP_CLIENT_IP'];
+
+        $strictness = 1;
+        $result = json_decode(file_get_contents(sprintf('https://ipqualityscore.com/api/json/ip/%s/%s?strictness=%s', $key, $ip, $strictness)), true);
+
+        // Remove $ip condition from below on production
+        if($result !== null && $ip!='127.0.0.1'){ 
+            if($result['vpn'] || $result['tor']){
+                //exit("Please disable your proxy connection!");            
+                throw ValidationException::withMessages([
+                    $request->first_name => [trans('auth.proxyFraud')],
+                ]);
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Attempt to check the similar Ip's D class check
+     *
+     * @return bool
+     */
+    protected function ipDClassCheck($ip)
+    {
+        $abcClass = substr($ip, 0, strrpos($ip, "."));
+        $Dclass = substr($ip, strrpos($ip, ".")+1);
+        $repeatIPCnt='';
+        $info = DB::select("SELECT SUBSTRING_INDEX(ip_registered_with, '.', 3) AS abc_Class 
+            ,COUNT(SUBSTRING_INDEX(ip_registered_with, '.', 3)) AS abc_Class_cnt 
+            ,group_concat(id)
+            ,group_concat(ip_registered_with)
+            FROM users
+            WHERE deleted_at IS NULL
+            AND SUBSTRING_INDEX(ip_registered_with, '.', 3) = '$abcClass'
+            AND SUBSTRING_INDEX(ip_registered_with, '.', -1) != '$Dclass'
+            GROUP BY SUBSTRING_INDEX(ip_registered_with, '.', 3) ");
+
+        $uniqueIpCheck = DB::select("SELECT COUNT(id) AS cnt FROM users WHERE ip_registered_with = '$ip' ")[0];
+
+        if(isset($info[0]))
+        {
+            $repeatIPCnt = $info[0]->abc_Class_cnt;
+            if($repeatIPCnt >= 2)
+            {
+                throw ValidationException::withMessages([
+                    $ip.'-Dclass-fraud' => [trans('auth.repeatedIPFraudRegister')],
+                ]);
+            } 
+        }
+        if($uniqueIpCheck->cnt > 0)
+        {
+            throw ValidationException::withMessages([
+                $ip.'-unique-ip-fraud' => [trans('auth.repeatedIPFraudRegister')],
+            ]);
+        }
+        
+        return true;
+    }
+
+    /**
+     * Shows the application consentual information page that redirects a user to registration page of promo.
+     *
+     * @param Request $request
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function showPromoConsentPage(Request $request)
+    {
+        $request_data = $request->query();
+
+
+        return view('frontend.auth.promo_consent');
+            /* ->withSocialiteLinks((new Socialite)->getSocialLinks())
+            ->withCurrentCountry($ipcountryCode)
+            ->withCountries($countries)
+            ->with('con_code',$country_code)
+            ->with('lang_code',$lang_code);*/
+    }
+
+    /**
+     * Show the application registration form that are redirected by Promo Landing and saving the affiliate_data.
+     *
+     * @param Request $request
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function showPromoRegistrationForm(Request $request)
+    {
+        $geodata = geoip(request()->ip()); //geoip(request()->ip());
+
+        $request_data = $request->query();
+        $country_code = $request->input('con',$geodata->iso_code);
+        $lang_code = $request->input('lang',false);
+        $user_group = $request->input('user_group',false);
+        Cookie::queue('user_group',$user_group);
+        $cookie_data = $request->only(['utm_campaign', 'utm_source', 'utm_medium', 'utm_content']);
+        if (!empty($cookie_data) && !empty($cookie_data['utm_source'])) {
+            $aff = AffiliateList::where('code', '=', $cookie_data['utm_source'])->first(['aff_vars']);
+            $aff_vars = explode(',', $aff->aff_vars);
+            $varsData = $request->only($aff_vars);
+            $cookie_data = array_merge($cookie_data, $varsData);
+        }
+        Cookie::queue('affiliate_data', json_encode($cookie_data));
+        abort_unless(config('access.registration'), 404);
+        $geodata = geoip(request()->ip());
+        $ipcountryCode = $geodata->getAttribute('iso_code');
+        /*Todo for $countries as withTranslation() function is not working*/
+        $countries = $this->generalRepository->getActiveCountries();
+        return view('frontend.auth.promo_register')
+            ->withSocialiteLinks((new Socialite)->getSocialLinks())
+            ->withCurrentCountry($ipcountryCode)
+            ->withCountries($countries)
+            ->with('con_code',$country_code)
+            ->with('lang_code',$lang_code);
+    }
+
+    /**
+     * Registration for Promo Landing Users.
+     *
+     * @param PromoRegisterRequest $request
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
+     * @throws \Throwable
+     */
+
+    public function postPromoRegister(PromoRegisterRequest $request)
+    {
+        abort_unless(config('access.registration'), 404);
+        $check_affiliate_cookie = $this->userRepository->checkAffiliateCookie();
+        $lang = $request->input('language',false);
+        $con = $request->input('country',false);
+        $locales = [
+            'locale' => strtolower($lang).'_'.$con
+        ];
+        $register_input_data = $request->only('first_name', 'last_name', 'email', 'consent','password','country');
+        if($request->hasCookie('user_group')){
+            $user_group = Cookie::get('user_group');
+            $register_input_data['user_group'] = $user_group;
+        }
+        $updated_register_data = array_merge($register_input_data, $locales);
+        $user = $this->userRepository->create($updated_register_data);
+        $check_invite_cookie = $this->userRepository->checkInviteCookieCode();
+        if($check_invite_cookie){
+            $this->userRepository->giveUserInvitePoints($check_invite_cookie,$user);
+        }
+        if( !empty($check_affiliate_cookie) ) {
+            $cookie_data = json_decode($check_affiliate_cookie);
+            $this->userRepository->createAffiliateCampData($cookie_data, $user);
+        }
+        event(new UserRegistered($user, $updated_register_data));
+        // If the user must confirm their email or their account requires approval,
+        // create the account but don't log them in.
+        if (config('access.users.confirm_email') || config('access.users.requires_approval')) {
+            activity()
+                ->causedBy($user)
+                ->log('inpanel.activity_log.registration');
+            return view('frontend.auth.confirmation_sent_page')->withFlashSuccess(
+                config('access.users.requires_approval') ?
+                    __('exceptions.frontend.auth.confirmation.created_pending') :
+                    __('exceptions.frontend.auth.confirmation.created_confirm')
+            );
+        } else {
+            auth()->login($user);
+            return redirect($this->redirectPath());
+        }
+    }
+
+    public function getCountryLanguage(Request $request)
+    {
+        $country_code = $request->country_code;
+        $language = $this->userRepository->getCountry($country_code);
+        return response()->json($language);
+    }
+
+    public function complete2FARegister(Request $request)
+    {
+        $user = $request->user;
+        $request->merge(session('registration_data'));
+
+        // Call the default laravel authentication
+
+        return $this->registerTwoFactorAuth($user,$request);
+    }
+
+    private function registerTwoFactorAuth($user,$data)
+    {
+        $user->google2fa_secret = $data->google2fa_secret;
+        $user->save();
+        return redirect()->route('frontend.auth.logout')
+            ->withFlashSuccess('Successfully updated Two Factor Authentication');
+    }
+}
+>>>>>>> dev

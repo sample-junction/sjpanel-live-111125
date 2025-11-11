@@ -1,0 +1,1563 @@
+<<<<<<< HEAD
+<?php
+
+namespace App\Repositories\Backend\Auth;
+
+use App\Models\Auth\User;
+use App\Models\Profiler\UserAdditionalData;
+use Illuminate\Support\Facades\DB;
+use App\Exceptions\GeneralException;
+use App\Repositories\BaseRepository;
+use App\Events\Backend\Auth\User\UserCreated;
+use App\Events\Backend\Auth\User\UserUpdated;
+use App\Events\Backend\Auth\User\UserRestored;
+use App\Events\Backend\Auth\User\UserConfirmed;
+use Illuminate\Pagination\LengthAwarePaginator;
+use App\Events\Backend\Auth\User\UserDeactivated;
+use App\Events\Backend\Auth\User\UserReactivated;
+use App\Events\Backend\Auth\User\UserUnconfirmed;
+use App\Events\Backend\Auth\User\UserPasswordChanged;
+use App\Notifications\Backend\Auth\UserAccountActive;
+use App\Events\Backend\Auth\User\UserPermanentlyDeleted;
+use App\Notifications\Frontend\Auth\UserNeedsConfirmation;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Config;
+use App\Models\Profiler\ProfileSection;
+use App\Models\Profiler\ProfilerQuestions;
+use App\Models\Profiler\GlobalProfileQuestion;
+use App\Models\Setting\Setting;
+
+/**
+ * Class UserRepository.
+ */
+class UserRepository extends BaseRepository
+{
+    /**
+     * @return string
+     */
+    public function model()
+    {
+        return User::class;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getUnconfirmedCount() : int
+    {
+        return $this->model
+            ->where('confirmed', 0)
+            ->count();
+    }
+
+    /**
+     * @param int    $paged
+     * @param string $orderBy
+     * @param string $sort
+     *
+     * @return mixed
+     */
+    public function getActivePaginated($paged = 25, $orderBy = 'created_at', $sort = 'desc') : LengthAwarePaginator
+    {
+        return $this->model
+            ->with('roles', 'permissions', 'providers')
+            ->active()
+            ->orderBy($orderBy, $sort)
+            ->paginate($paged);
+    }
+
+    public function getUsers()
+    {
+        return $this->model
+            ->with('roles', 'permissions', 'providers')
+            ->active()
+            ->get();
+    }
+
+    public function getActiveUsers($uuids=null,$panelists=null)
+    {
+        $getMonthLimit = Setting::where('key','=','PANEL_ACTIVE_MONTH_LIMIT')->first();
+        $lastMonth = $getMonthLimit->value;
+        $fromDate = now()->subMonths($lastMonth);
+        $toDate   = now();
+        if($uuids){
+        //     return DB::table('users')
+        //     ->select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at')
+        //     ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+        //     ->leftJoin('user_projects','user_projects.user_id','=','users.id')
+        //     ->where('users.confirmed',"1")
+        //     ->where('users.unsubscribed',"0")
+        //     ->where('users.is_blacklist',"0")
+        //     ->where('user_projects.updated_at',">", Carbon::now()->subMonths(6))
+        //     ->whereNull('users.deleted_at')
+        //   //  ->whereNotNull('user_projects.status')
+        //     ->whereIn('users.email', $emailids)
+        //     ->groupBy('user_projects.user_id')
+        //     ->get();
+
+            //return DB::table('users')
+            return User::select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at','T2.updated_at')
+                ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+                ->leftJoin(DB::raw('(SELECT user_id,updated_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `user_id` order BY `updated_at` DESC)').' AS `row_num` FROM `user_projects` WHERE `status` IS NOT NULL)').' AS T1 WHERE T1.`row_num` = 1) as T2'), function ($join) {
+                                $join->on ('users.id', '=', 'T2.user_id' );
+                            }) 
+                ->leftJoin(DB::raw('(SELECT causer_id,created_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `causer_id` order BY `created_at` DESC)').' AS `row_num` FROM `activity_log`)').' AS T3 WHERE T3.`row_num` = 1) as T4'), function ($join) {
+                                $join->on ('users.id', '=', 'T4.causer_id' );
+                             })          
+                ->where('users.confirmed',"2")
+                //->where('users.unsubscribed',"0")
+                ->where('users.is_blacklist',"0")
+                //->where('T2.updated_at',">", Carbon::now()->subMonths($lastMonth))
+                ->where(function($query) use ($fromDate, $toDate){
+                    $query->whereBetween('T2.updated_at', [$fromDate, $toDate])
+                          ->orWhereBetween('T4.created_at', [$fromDate, $toDate]);
+                  })
+                ->whereNull('users.deleted_at')
+                ->whereIn('users.uuid', $uuids)
+                ->get();
+
+        }elseif($panelists){
+        //     return DB::table('users')
+        //     ->select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at')
+        //     ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+        //     ->leftJoin('user_projects','user_projects.user_id','=','users.id')
+        //     ->where('users.confirmed',"1")
+        //     ->where('users.unsubscribed',"0")
+        //     ->where('users.is_blacklist',"0")
+        //     ->where('user_projects.updated_at',">", Carbon::now()->subMonths(6))
+        //     ->whereNull('users.deleted_at')
+        //   //  ->whereNotNull('user_projects.status')          
+        //     ->whereIn('users.panellist_id', $panelists)
+        //     ->groupBy('user_projects.user_id')
+        //     ->get();
+
+            //return DB::table('users')
+                return User::select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at','T2.updated_at')
+                ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+                ->leftJoin(DB::raw('(SELECT user_id,updated_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `user_id` order BY `updated_at` DESC)').' AS `row_num` FROM `user_projects` WHERE `status` IS NOT NULL)').' AS T1 WHERE T1.`row_num` = 1) as T2'), function ($join) {
+                                $join->on ('users.id', '=', 'T2.user_id' );
+                            }) 
+                ->leftJoin(DB::raw('(SELECT causer_id,created_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `causer_id` order BY `created_at` DESC)').' AS `row_num` FROM `activity_log`)').' AS T3 WHERE T3.`row_num` = 1) as T4'), function ($join) {
+                                $join->on ('users.id', '=', 'T4.causer_id' );
+                             })             
+                ->where('users.confirmed',"2")
+                //->where('users.unsubscribed',"0")
+                ->where('users.is_blacklist',"0")
+                //->where('T2.updated_at',">", Carbon::now()->subMonths($lastMonth))
+                ->where(function($query) use ($fromDate, $toDate){
+                    $query->whereBetween('T2.updated_at', [$fromDate, $toDate])
+                          ->orWhereBetween('T4.created_at', [$fromDate, $toDate]);
+                  })
+                ->whereNull('users.deleted_at')
+                ->whereIn('users.panellist_id', $panelists)
+                ->get();
+
+        }else{
+           /* return DB::table('users')
+            ->select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at')
+            ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+            ->leftJoin('user_projects','user_projects.user_id','=','users.id')
+            ->where('users.confirmed',"1")
+            ->where('users.unsubscribed',"0")
+            ->where('users.is_blacklist',"0")
+            ->where('user_projects.updated_at',">", Carbon::now()->subMonths(6))
+            ->whereNull('users.deleted_at')
+          //  ->whereNotNull('user_projects.status') 
+            ->groupBy('user_projects.user_id')
+            ->get();*/
+
+            //return DB::table('users')
+                return User::select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at','T2.updated_at')
+                ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+                ->leftJoin(DB::raw('(SELECT user_id,updated_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `user_id` order BY `updated_at` DESC)').' AS `row_num` FROM `user_projects` WHERE `status` IS NOT NULL)').' AS T1 WHERE T1.`row_num` = 1) as T2'), function ($join) {
+                                $join->on ('users.id', '=', 'T2.user_id' );
+                            })  
+                ->leftJoin(DB::raw('(SELECT causer_id,created_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `causer_id` order BY `created_at` DESC)').' AS `row_num` FROM `activity_log`)').' AS T3 WHERE T3.`row_num` = 1) as T4'), function ($join) {
+                                $join->on ('users.id', '=', 'T4.causer_id' );
+                             })            
+                ->where('users.confirmed',"2")
+                //->where('users.unsubscribed',"0")
+                ->where('users.is_blacklist',"0")
+                //->where('T2.updated_at',">", Carbon::now()->subMonths($lastMonth))
+                ->where(function($query) use ($fromDate, $toDate){
+                    $query->whereBetween('T2.updated_at', [$fromDate, $toDate])
+                          ->orWhereBetween('T4.created_at', [$fromDate, $toDate]);
+                  })
+                ->whereNull('users.deleted_at')
+                ->get();
+
+        }
+       
+        //return $roles;
+
+        //echo "<pre>";print_r($data);die;
+    }
+
+
+    public function getActiveUsersForFraud($uuids=null,$panelists=null,$status=null)
+    {
+        
+        if($uuids){
+            return DB::table('users')
+            ->select('users.*','T1.fraudcount','T1.projectcode')
+            ->leftJoin(DB::raw('(SELECT panellist_id, '.DB::raw('COUNT(panellist_id) as fraudcount').','.DB::raw('GROUP_CONCAT(project_id) as projectcode').' FROM froud_users GROUP BY (panellist_id)
+                        ) as T1'), function ($join) {
+                            $join->on ('users.panellist_id', '=', 'T1.panellist_id' );
+                        })           
+            ->where('users.confirmed',"2")
+            //->where('users.unsubscribed',"0")
+            //->where('users.is_blacklist',"0")
+            ->whereNull('users.deleted_at')
+            ->whereIn('users.uuid', $uuids)
+            ->get();
+        }elseif($panelists){
+            return DB::table('users')
+            ->select('users.*','T1.fraudcount','T1.projectcode')
+            ->leftJoin(DB::raw('(SELECT panellist_id, '.DB::raw('COUNT(panellist_id) as fraudcount').','.DB::raw('GROUP_CONCAT(project_id) as projectcode').' FROM froud_users GROUP BY (panellist_id)
+                        ) as T1'), function ($join) {
+                            $join->on ('users.panellist_id', '=', 'T1.panellist_id' );
+                        })
+            ->where('users.confirmed',"2")
+            //->where('users.unsubscribed',"0")
+            //->where('users.is_blacklist',"0")
+            ->whereNull('users.deleted_at')
+            ->whereIn('users.panellist_id', $panelists)
+            ->get();
+        }elseif($status){
+            return DB::table('users')
+            ->select('users.*','T1.fraudcount','T1.projectcode')
+            ->leftJoin(DB::raw('(SELECT panellist_id, '.DB::raw('COUNT(panellist_id) as fraudcount').','.DB::raw('GROUP_CONCAT(project_id) as projectcode').' FROM froud_users GROUP BY (panellist_id)
+                        ) as T1'), function ($join) {
+                            $join->on ('users.panellist_id', '=', 'T1.panellist_id' );
+                        })
+            ->where('users.confirmed',"1")
+            //->where('users.unsubscribed',"0")
+            //->where('users.is_blacklist',"0")
+            ->whereNull('users.deleted_at')
+
+            //->whereIn('users.panellist_id', $panelists)
+            ->orderBy('users.id','desc')
+            ->get();
+        }
+
+
+        else{
+        //     return DB::table('users')
+        //   //  ->select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','froud_users.id')
+        //     ->select("ANY_VALUE(users.uuid)", "ANY_VALUE(users.panellist_id)", "ANY_VALUE(users.gender)")
+        //     ->selectRaw("COUNT(users.panellist_id) AS fraudcount")
+        //    // ->selectRaw("COUNT(froud_users.id) AS fraudcount")
+        //    // ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+        //     //->leftJoin('froud_users','froud_users.panelist_id','=','users.panellist_id')
+        //     ->where('users.confirmed',"1")
+        //     ->where('users.unsubscribed',"0")
+        //    // ->where('users.is_blacklist',"0")
+        //     ->whereNull('users.deleted_at')
+        //     ->groupBy('users.panellist_id')
+        //     ->get();
+
+          return DB::table('users')
+          ->select('users.*','T1.fraudcount','T1.projectcode')
+          ->leftJoin(DB::raw('(SELECT panellist_id, '.DB::raw('COUNT(panellist_id) as fraudcount').','.DB::raw('GROUP_CONCAT(project_id) as projectcode').' FROM froud_users GROUP BY (panellist_id)
+                      ) as T1'), function ($join) {
+                          $join->on ('users.panellist_id', '=', 'T1.panellist_id' );
+                      })  
+            ->where('users.confirmed',"2")
+            //->where('users.unsubscribed',"0")
+           // ->where('users.is_blacklist',"0")
+            ->whereNull('users.deleted_at')
+            ->get();
+        }
+       
+        //return $roles;
+
+        //echo "<pre>";print_r($data);die;
+    }
+
+    public function getActiveUsersold()
+    {
+        
+        return $this->model
+            ->with(['roles' => function($q){
+                $q->where('role_id', '4');
+                }], 'permissions', 'providers')
+            ->active()
+            ->confirmed()
+            ->get();
+        //echo "<pre>";print_r($data);die;
+    }
+    /**
+     * @param int    $paged
+     * @param string $orderBy
+     * @param string $sort
+     *
+     * @return LengthAwarePaginator
+     */
+    public function getInactivePaginated($paged = 25, $orderBy = 'created_at', $sort = 'desc') : LengthAwarePaginator
+    {
+        return $this->model
+            ->with('roles', 'permissions', 'providers')
+            ->active(false)
+            ->orderBy($orderBy, $sort)
+            ->paginate($paged);
+    }
+
+    /**
+     * @param int    $paged
+     * @param string $orderBy
+     * @param string $sort
+     *
+     * @return LengthAwarePaginator
+     */
+    public function getDeletedPaginated($paged = 25, $orderBy = 'created_at', $sort = 'desc') : LengthAwarePaginator
+    {
+        return $this->model
+            ->with('roles', 'permissions', 'providers')
+            ->onlyTrashed()
+            ->orderBy($orderBy, $sort)
+            ->paginate($paged);
+    }
+
+    /**
+     * @param array $data
+     *
+     * @return User
+     * @throws \Exception
+     * @throws \Throwable
+     */
+    public function create(array $data) : User
+    {
+        return DB::transaction(function () use ($data) {
+            $user = parent::create([
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'email' => $data['email'],
+                'password' => $data['password'],
+                'active' => isset($data['active']) && $data['active'] == '1' ? 1 : 0,
+                'confirmation_code' => md5(uniqid(mt_rand(), true)),
+                'confirmed' => isset($data['confirmed']) && $data['confirmed'] == '1' ? 1 : 0,
+            ]);
+
+            // See if adding any additional permissions
+            if (! isset($data['permissions']) || ! count($data['permissions'])) {
+                $data['permissions'] = [];
+            }
+
+            if ($user) {
+                // User must have at least one role
+                if (! count($data['roles'])) {
+                    throw new GeneralException(__('exceptions.backend.access.users.role_needed_create'));
+                }
+
+                // Add selected roles/permissions
+                $user->syncRoles($data['roles']);
+                $user->syncPermissions($data['permissions']);
+
+                //Send confirmation email if requested and account approval is off
+                if (isset($data['confirmation_email']) && $user->confirmed == 0 && ! config('access.users.requires_approval')) {
+                    $user->notify(new UserNeedsConfirmation($user->confirmation_code));
+                }
+
+                event(new UserCreated($user));
+
+                return $user;
+            }
+
+            throw new GeneralException(__('exceptions.backend.access.users.create_error'));
+        });
+    }
+
+    /**
+     * @param User  $user
+     * @param array $data
+     *
+     * @return User
+     * @throws GeneralException
+     * @throws \Exception
+     * @throws \Throwable
+     */
+    public function update(User $user, array $data) : User
+    {
+        $this->checkUserByEmail($user, $data['email']);
+
+        // See if adding any additional permissions
+        if (! isset($data['permissions']) || ! count($data['permissions'])) {
+            $data['permissions'] = [];
+        }
+
+        return DB::transaction(function () use ($user, $data) {
+            if ($user->update([
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'email' => $data['email'],
+            ])) {
+                // Add selected roles/permissions
+                $user->syncRoles($data['roles']);
+                $user->syncPermissions($data['permissions']);
+
+                event(new UserUpdated($user));
+
+                return $user;
+            }
+
+            throw new GeneralException(__('exceptions.backend.access.users.update_error'));
+        });
+    }
+
+    /**
+     * @param User $user
+     * @param      $input
+     *
+     * @return User
+     * @throws GeneralException
+     */
+    public function updatePassword(User $user, $input) : User
+    {
+        if ($user->update(['password' => $input['password']])) {
+            event(new UserPasswordChanged($user));
+
+            return $user;
+        }
+
+        throw new GeneralException(__('exceptions.backend.access.users.update_password_error'));
+    }
+
+    /**
+     * @param User $user
+     * @param      $status
+     *
+     * @return User
+     * @throws GeneralException
+     */
+    public function mark(User $user, $status) : User
+    {
+        if (auth()->id() == $user->id && $status == 0) {
+            throw new GeneralException(__('exceptions.backend.access.users.cant_deactivate_self'));
+        }
+
+        $user->active = $status;
+
+        switch ($status) {
+            case 0:
+                event(new UserDeactivated($user));
+            break;
+
+            case 1:
+                event(new UserReactivated($user));
+            break;
+        }
+
+        if ($user->save()) {
+            return $user;
+        }
+
+        throw new GeneralException(__('exceptions.backend.access.users.mark_error'));
+    }
+
+    /**
+     * @param User $user
+     *
+     * @return User
+     * @throws GeneralException
+     */
+    public function confirm(User $user) : User
+    {
+        if ($user->confirmed) {
+            throw new GeneralException(__('exceptions.backend.access.users.already_confirmed'));
+        }
+
+        $user->confirmed = 1;
+        $confirmed = $user->save();
+
+        if ($confirmed) {
+            event(new UserConfirmed($user));
+
+            // Let user know their account was approved
+            if (config('access.users.requires_approval')) {
+                $user->notify(new UserAccountActive);
+            }
+
+            return $user;
+        }
+
+        throw new GeneralException(__('exceptions.backend.access.users.cant_confirm'));
+    }
+
+    /**
+     * @param User $user
+     *
+     * @return User
+     * @throws GeneralException
+     */
+    public function unconfirm(User $user) : User
+    {
+        if (! $user->confirmed) {
+            throw new GeneralException(__('exceptions.backend.access.users.not_confirmed'));
+        }
+
+        if ($user->id == 1) {
+            // Cant un-confirm admin
+            throw new GeneralException(__('exceptions.backend.access.users.cant_unconfirm_admin'));
+        }
+
+        if ($user->id == auth()->id()) {
+            // Cant un-confirm self
+            throw new GeneralException(__('exceptions.backend.access.users.cant_unconfirm_self'));
+        }
+
+        $user->confirmed = 0;
+        $unconfirmed = $user->save();
+
+        if ($unconfirmed) {
+            event(new UserUnconfirmed($user));
+
+            return $user;
+        }
+
+        throw new GeneralException(__('exceptions.backend.access.users.cant_unconfirm'));
+    }
+
+    /**
+     * @param User $user
+     *
+     * @return User
+     * @throws GeneralException
+     * @throws \Exception
+     * @throws \Throwable
+     */
+    public function forceDelete(User $user) : User
+    {
+        if (is_null($user->deleted_at)) {
+            throw new GeneralException(__('exceptions.backend.access.users.delete_first'));
+        }
+
+        return DB::transaction(function () use ($user) {
+            // Delete associated relationships
+            $user->passwordHistories()->delete();
+            $user->providers()->delete();
+            $user->sessions()->delete();
+
+            if ($user->forceDelete()) {
+                event(new UserPermanentlyDeleted($user));
+
+                return $user;
+            }
+
+            throw new GeneralException(__('exceptions.backend.access.users.delete_error'));
+        });
+    }
+
+    /**
+     * @param User $user
+     *
+     * @return User
+     * @throws GeneralException
+     */
+    public function restore(User $user) : User
+    {
+        if (is_null($user->deleted_at)) {
+            throw new GeneralException(__('exceptions.backend.access.users.cant_restore'));
+        }
+
+        if ($user->restore()) {
+            event(new UserRestored($user));
+
+            return $user;
+        }
+
+        throw new GeneralException(__('exceptions.backend.access.users.restore_error'));
+    }
+
+    /**
+     * @param User $user
+     * @param      $email
+     *
+     * @throws GeneralException
+     */
+    protected function checkUserByEmail(User $user, $email)
+    {
+        //Figure out if email is not the same
+        if ($user->email != $email) {
+            //Check to see if email exists
+            if ($this->model->where('email', '=', $email)->first()) {
+                throw new GeneralException(trans('exceptions.backend.access.users.email_error'));
+            }
+        }
+    }
+
+    public function getUserAnswersByUserIds($userIdsArray)
+    {
+        $userAnswers = UserAdditionalData::whereIn('uuid', $userIdsArray)->project([
+            'uuid' => true,
+            'u_id' => true,
+            'user_answers' => true,
+
+        ])->get();
+        return $userAnswers;
+    }
+
+    public function getUseCompleteData($userid=null,$profile_sections=[],$countryCode)
+    {
+        $exportData = array();
+        if($userid){
+            $user = $this->getById($userid);
+        }else{
+            $user = $this->getById(auth()->id());
+        }
+        /*echo '<pre>';
+        print_r($user);*/
+      /* $basicFields = $user->getUserBasicFields();
+        print_r($basicFields);die;*/
+       // $basicFields = array('first_name'=>'First Name','last_name'=>'Last Name','email'=>'Email','timezone'=>'Timezone','gender'=>'Gender','dob'=>'Date of Birth','zipcode'=>'Zipcode / Postcode','locale'=>'Locale','country_code'=>'Country Code','panellist_id'=>'Panellist Id');
+
+        $basicFields = array('panellist_id'=>'Panellist_Id','dob'=>'DOB','age'=>'Age','zipcode'=>'Zipcode','device_preference'=>'Device_Preference');
+
+        $get_user_Add_data = UserAdditionalData::where('uuid','=',$user->uuid)->first();
+        //echo '<pre>';
+       // print_r($get_user_Add_data);die;
+
+        if ($get_user_Add_data['user_answers']) {
+            //$user_answer = $get_user_Add_data->user_answers;
+        
+        
+            //$locale = Config::get('app.locale');
+            $locale = "en_".$countryCode;
+            $question_text = [];
+            foreach($get_user_Add_data['user_answers'] as $key=>$value){
+                
+                $profile_section_code = $value['profile_section_code'];
+                //use in_array()
+                if(!in_array($profile_section_code,$profile_sections)){
+                    continue;
+                }
+                //print_r($profile_section_code);
+                $question_code= $value['profile_question_code'];
+                if(is_array($value['selected_answer'])){
+                    $selectedAnswer = $value['selected_answer'];
+                }else{
+                    $selectedAnswer = explode(" ",$value['selected_answer']); 
+                }
+                $question_text[] = $this->getQuestionText($profile_section_code,$question_code,$locale,$selectedAnswer);
+            }
+            //die;
+            $exportData['Basic Profile']= [];
+            foreach($question_text  as $data){
+                foreach ($data as $key=>$value){
+                    $basicFields[$key] = $value;
+                }
+            }
+            foreach( $basicFields as $key => $value ){
+                if($key == 'dob'){
+                    $exportData['Basic Profile'][$value] = $user->$key->format('m-d-Y');
+                }else if ( $key == 'age' ){
+                    $exportData['Basic Profile'][$value] = Carbon::parse($user->dob)->age;
+                }else if ( $key == 'device_preference' ){
+                    $exportData['Basic Profile'][$value] = $this->getDevicePreferenceName($user->device_preference);
+                }else{
+                    if($user->$key){
+                        $exportData['Basic Profile'][$value] = $user->$key;
+                    }else{
+                        $exportData['Basic Profile'][$key] = $value;
+                    }
+                }
+
+            }
+            $exportData['Detailed Profile'] = [];
+            /*Todo Details profile has to be added*/
+            /* $userAnswers = UserAnswer::whereUserId($user->id)->with('question')->get();
+            foreach ($userAnswers as $userAnswer) {
+                $question = $userAnswer->question;
+
+                $answer = DetailedProfileRepository::getAnswerforQuestion($question, $userAnswer->user_answer);
+
+                $exportData['Detailed Profile'][$question->display_name] = $answer;
+            }*/
+                return $exportData;
+        }else{
+            $exportData['Basic Profile']= [];
+            $exportData['Detailed Profile'] = [];
+            return $exportData; 
+        }
+    }
+
+    /**
+     * This action is used for getting the User Question Details with their Answers.
+     *
+     * @param $fullName
+     *
+     * @return array
+     */
+
+    private function getQuestionText($profile_section_code,$question_code,$locale,$selected_answer)
+    {
+        $locale =explode('_',$locale);
+        $country = $locale[1];
+        $language = $locale[0];
+        $sectionProjection = ProfileSection::getProjectionArray($country, strtoupper($language));
+        $questionsProjection = ProfilerQuestions::getProjectionArray($country,strtoupper($language));
+        //print_r($questionsProjection);
+        $profile = ProfileSection::where('general_name', '=', $profile_section_code)->project($sectionProjection)->first();
+        if($profile_section_code!=="BASIC" && $profile_section_code!=="HIDDEN"){
+            $profileQuestion = ProfilerQuestions::where('profile_section_code', '=',$profile_section_code)
+                ->where('general_name','=',$question_code)
+                ->project($questionsProjection)
+                ->first();
+
+               
+            $profile->questions = $profileQuestion;            
+            $question_data = [];
+            if(!empty($profileQuestion->translated)){
+                foreach($profileQuestion->translated as $question){
+                    //$question_text = $question['text'];
+                    $question_text = $question_code;
+                    $answer_text = [];
+                    foreach($question['answers'] as $key=>$value){
+                        if(in_array($value['precode'],$selected_answer)){
+                            $answer_text[] = $value['display_name'];
+                        }
+                    }
+
+                    $question_data[$question_text] = implode('|',$answer_text);
+                }
+            }
+            
+           // print_r($question_data);die;
+           
+        }elseif($profile_section_code=="BASIC"&& $profile_section_code!=="HIDDEN") {
+            $profileQuestion = GlobalProfileQuestion::where('general_name','=',$question_code)
+                ->project($questionsProjection)
+                ->first();
+            $profile->questions = $profileQuestion;
+            
+            $question_data = [];
+            if(!empty($profileQuestion->translated)){
+                foreach($profileQuestion->translated as $question){
+                    //$question_text = $question['text'];
+                    $question_text = $question_code;
+                    $answer_text = [];
+                    if($question['answers']) {
+                        foreach ($question['answers'] as $key => $value) {
+                            if (in_array($value['precode'], $selected_answer)) {
+                                $answer_text[] = $value['display_name'];
+                            }
+                        }
+                    } else {
+                        $answer_text = $selected_answer;
+                    }
+                    $question_data[$question_text] = implode('|',$answer_text);
+                }
+            }
+           
+        } else {
+            $question_text = $question_code;
+            $answer_text[] = $selected_answer;
+            $question_data[$question_text] = implode('|',$selected_answer);
+        }
+      // print_r($question_data);//die;
+        return $question_data;
+    }
+
+    public function getDevicePreferenceName($devicePreference){
+        $devicepreference = [];
+        $deviceArray = explode(',',$devicePreference);
+        if(in_array("1", $deviceArray)){
+            $devicepreference[]="All Device";
+        }else{
+            foreach($deviceArray as $device){
+                if($device==2){
+                    $devicepreference[]="Desktop/Laptop";
+                }else if($device==3){
+                    $devicepreference[]="Mobile/Phone";
+                }else if($device==4){
+                    $devicepreference[]="Tablet";
+                }
+            }
+        }
+        
+        return implode(',',$devicepreference);
+    }
+
+    
+}
+=======
+<?php
+
+namespace App\Repositories\Backend\Auth;
+
+use App\Models\Auth\User;
+use App\Models\Profiler\UserAdditionalData;
+use Illuminate\Support\Facades\DB;
+use App\Exceptions\GeneralException;
+use App\Repositories\BaseRepository;
+use App\Events\Backend\Auth\User\UserCreated;
+use App\Events\Backend\Auth\User\UserUpdated;
+use App\Events\Backend\Auth\User\UserRestored;
+use App\Events\Backend\Auth\User\UserConfirmed;
+use Illuminate\Pagination\LengthAwarePaginator;
+use App\Events\Backend\Auth\User\UserDeactivated;
+use App\Events\Backend\Auth\User\UserReactivated;
+use App\Events\Backend\Auth\User\UserUnconfirmed;
+use App\Events\Backend\Auth\User\UserPasswordChanged;
+use App\Notifications\Backend\Auth\UserAccountActive;
+use App\Events\Backend\Auth\User\UserPermanentlyDeleted;
+use App\Notifications\Frontend\Auth\UserNeedsConfirmation;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Config;
+use App\Models\Profiler\ProfileSection;
+use App\Models\Profiler\ProfilerQuestions;
+use App\Models\Profiler\GlobalProfileQuestion;
+use App\Models\Setting\Setting;
+
+/**
+ * Class UserRepository.
+ */
+class UserRepository extends BaseRepository
+{
+    /**
+     * @return string
+     */
+    public function model()
+    {
+        return User::class;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getUnconfirmedCount() : int
+    {
+        return $this->model
+            ->where('confirmed', 0)
+            ->count();
+    }
+
+    /**
+     * @param int    $paged
+     * @param string $orderBy
+     * @param string $sort
+     *
+     * @return mixed
+     */
+    public function getActivePaginated($paged = 25, $orderBy = 'created_at', $sort = 'desc') : LengthAwarePaginator
+    {
+        return $this->model
+            ->with('roles', 'permissions', 'providers')
+            ->active()
+            ->orderBy($orderBy, $sort)
+            ->paginate($paged);
+    }
+
+    public function getUsers()
+    {
+        return $this->model
+            ->with('roles', 'permissions', 'providers')
+            ->active()
+            ->get();
+    }
+
+    public function getActiveUsers($uuids=null,$panelists=null)
+    {
+        $getMonthLimit = Setting::where('key','=','PANEL_ACTIVE_MONTH_LIMIT')->first();
+        $lastMonth = $getMonthLimit->value;
+        $fromDate = now()->subMonths($lastMonth);
+        $toDate   = now();
+        if($uuids){
+        //     return DB::table('users')
+        //     ->select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at')
+        //     ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+        //     ->leftJoin('user_projects','user_projects.user_id','=','users.id')
+        //     ->where('users.confirmed',"1")
+        //     ->where('users.unsubscribed',"0")
+        //     ->where('users.is_blacklist',"0")
+        //     ->where('user_projects.updated_at',">", Carbon::now()->subMonths(6))
+        //     ->whereNull('users.deleted_at')
+        //   //  ->whereNotNull('user_projects.status')
+        //     ->whereIn('users.email', $emailids)
+        //     ->groupBy('user_projects.user_id')
+        //     ->get();
+
+            //return DB::table('users')
+            return User::select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at','T2.updated_at')
+                ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+                ->leftJoin(DB::raw('(SELECT user_id,updated_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `user_id` order BY `updated_at` DESC)').' AS `row_num` FROM `user_projects` WHERE `status` IS NOT NULL)').' AS T1 WHERE T1.`row_num` = 1) as T2'), function ($join) {
+                                $join->on ('users.id', '=', 'T2.user_id' );
+                            }) 
+                ->leftJoin(DB::raw('(SELECT causer_id,created_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `causer_id` order BY `created_at` DESC)').' AS `row_num` FROM `activity_log`)').' AS T3 WHERE T3.`row_num` = 1) as T4'), function ($join) {
+                                $join->on ('users.id', '=', 'T4.causer_id' );
+                             })          
+                ->where('users.confirmed',"2")
+                //->where('users.unsubscribed',"0")
+                ->where('users.is_blacklist',"0")
+                //->where('T2.updated_at',">", Carbon::now()->subMonths($lastMonth))
+                ->where(function($query) use ($fromDate, $toDate){
+                    $query->whereBetween('T2.updated_at', [$fromDate, $toDate])
+                          ->orWhereBetween('T4.created_at', [$fromDate, $toDate]);
+                  })
+                ->whereNull('users.deleted_at')
+                ->whereIn('users.uuid', $uuids)
+                ->get();
+
+        }elseif($panelists){
+        //     return DB::table('users')
+        //     ->select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at')
+        //     ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+        //     ->leftJoin('user_projects','user_projects.user_id','=','users.id')
+        //     ->where('users.confirmed',"1")
+        //     ->where('users.unsubscribed',"0")
+        //     ->where('users.is_blacklist',"0")
+        //     ->where('user_projects.updated_at',">", Carbon::now()->subMonths(6))
+        //     ->whereNull('users.deleted_at')
+        //   //  ->whereNotNull('user_projects.status')          
+        //     ->whereIn('users.panellist_id', $panelists)
+        //     ->groupBy('user_projects.user_id')
+        //     ->get();
+
+            //return DB::table('users')
+                return User::select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at','T2.updated_at')
+                ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+                ->leftJoin(DB::raw('(SELECT user_id,updated_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `user_id` order BY `updated_at` DESC)').' AS `row_num` FROM `user_projects` WHERE `status` IS NOT NULL)').' AS T1 WHERE T1.`row_num` = 1) as T2'), function ($join) {
+                                $join->on ('users.id', '=', 'T2.user_id' );
+                            }) 
+                ->leftJoin(DB::raw('(SELECT causer_id,created_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `causer_id` order BY `created_at` DESC)').' AS `row_num` FROM `activity_log`)').' AS T3 WHERE T3.`row_num` = 1) as T4'), function ($join) {
+                                $join->on ('users.id', '=', 'T4.causer_id' );
+                             })             
+                ->where('users.confirmed',"2")
+                //->where('users.unsubscribed',"0")
+                ->where('users.is_blacklist',"0")
+                //->where('T2.updated_at',">", Carbon::now()->subMonths($lastMonth))
+                ->where(function($query) use ($fromDate, $toDate){
+                    $query->whereBetween('T2.updated_at', [$fromDate, $toDate])
+                          ->orWhereBetween('T4.created_at', [$fromDate, $toDate]);
+                  })
+                ->whereNull('users.deleted_at')
+                ->whereIn('users.panellist_id', $panelists)
+                ->get();
+
+        }else{
+           /* return DB::table('users')
+            ->select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at')
+            ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+            ->leftJoin('user_projects','user_projects.user_id','=','users.id')
+            ->where('users.confirmed',"1")
+            ->where('users.unsubscribed',"0")
+            ->where('users.is_blacklist',"0")
+            ->where('user_projects.updated_at',">", Carbon::now()->subMonths(6))
+            ->whereNull('users.deleted_at')
+          //  ->whereNotNull('user_projects.status') 
+            ->groupBy('user_projects.user_id')
+            ->get();*/
+
+            //return DB::table('users')
+                return User::select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','users.last_login_at','T2.updated_at')
+                ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+                ->leftJoin(DB::raw('(SELECT user_id,updated_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `user_id` order BY `updated_at` DESC)').' AS `row_num` FROM `user_projects` WHERE `status` IS NOT NULL)').' AS T1 WHERE T1.`row_num` = 1) as T2'), function ($join) {
+                                $join->on ('users.id', '=', 'T2.user_id' );
+                            })  
+                ->leftJoin(DB::raw('(SELECT causer_id,created_at FROM '.DB::raw('(SELECT *, '.DB::raw('ROW_NUMBER() OVER(PARTITION BY `causer_id` order BY `created_at` DESC)').' AS `row_num` FROM `activity_log`)').' AS T3 WHERE T3.`row_num` = 1) as T4'), function ($join) {
+                                $join->on ('users.id', '=', 'T4.causer_id' );
+                             })            
+                ->where('users.confirmed',"2")
+                //->where('users.unsubscribed',"0")
+                ->where('users.is_blacklist',"0")
+                //->where('T2.updated_at',">", Carbon::now()->subMonths($lastMonth))
+                ->where(function($query) use ($fromDate, $toDate){
+                    $query->whereBetween('T2.updated_at', [$fromDate, $toDate])
+                          ->orWhereBetween('T4.created_at', [$fromDate, $toDate]);
+                  })
+                ->whereNull('users.deleted_at')
+                ->get();
+
+        }
+       
+        //return $roles;
+
+        //echo "<pre>";print_r($data);die;
+    }
+
+
+    public function getActiveUsersForFraud($uuids=null,$panelists=null,$status=null)
+    {
+        
+        if($uuids){
+            return DB::table('users')
+            ->select('users.*','T1.fraudcount','T1.projectcode')
+            ->leftJoin(DB::raw('(SELECT panellist_id, '.DB::raw('COUNT(panellist_id) as fraudcount').','.DB::raw('GROUP_CONCAT(project_id) as projectcode').' FROM froud_users GROUP BY (panellist_id)
+                        ) as T1'), function ($join) {
+                            $join->on ('users.panellist_id', '=', 'T1.panellist_id' );
+                        })           
+            ->where('users.confirmed',"2")
+            //->where('users.unsubscribed',"0")
+            //->where('users.is_blacklist',"0")
+            ->whereNull('users.deleted_at')
+            ->whereIn('users.uuid', $uuids)
+            ->get();
+        }elseif($panelists){
+            return DB::table('users')
+            ->select('users.*','T1.fraudcount','T1.projectcode')
+            ->leftJoin(DB::raw('(SELECT panellist_id, '.DB::raw('COUNT(panellist_id) as fraudcount').','.DB::raw('GROUP_CONCAT(project_id) as projectcode').' FROM froud_users GROUP BY (panellist_id)
+                        ) as T1'), function ($join) {
+                            $join->on ('users.panellist_id', '=', 'T1.panellist_id' );
+                        })
+            ->where('users.confirmed',"2")
+            //->where('users.unsubscribed',"0")
+            //->where('users.is_blacklist',"0")
+            ->whereNull('users.deleted_at')
+            ->whereIn('users.panellist_id', $panelists)
+            ->get();
+        }elseif($status){
+            return DB::table('users')
+            ->select('users.*','T1.fraudcount','T1.projectcode')
+            ->leftJoin(DB::raw('(SELECT panellist_id, '.DB::raw('COUNT(panellist_id) as fraudcount').','.DB::raw('GROUP_CONCAT(project_id) as projectcode').' FROM froud_users GROUP BY (panellist_id)
+                        ) as T1'), function ($join) {
+                            $join->on ('users.panellist_id', '=', 'T1.panellist_id' );
+                        })
+            ->where('users.confirmed',"1")
+            //->where('users.unsubscribed',"0")
+            //->where('users.is_blacklist',"0")
+            ->whereNull('users.deleted_at')
+
+            //->whereIn('users.panellist_id', $panelists)
+            ->orderBy('users.id','desc')
+            ->get();
+        }
+
+
+        else{
+        //     return DB::table('users')
+        //   //  ->select('users.id','users.uuid','users.panellist_id','users.dob','users.gender','froud_users.id')
+        //     ->select("ANY_VALUE(users.uuid)", "ANY_VALUE(users.panellist_id)", "ANY_VALUE(users.gender)")
+        //     ->selectRaw("COUNT(users.panellist_id) AS fraudcount")
+        //    // ->selectRaw("COUNT(froud_users.id) AS fraudcount")
+        //    // ->selectRaw("TIMESTAMPDIFF(YEAR, DATE(users.dob), current_date) AS age")
+        //     //->leftJoin('froud_users','froud_users.panelist_id','=','users.panellist_id')
+        //     ->where('users.confirmed',"1")
+        //     ->where('users.unsubscribed',"0")
+        //    // ->where('users.is_blacklist',"0")
+        //     ->whereNull('users.deleted_at')
+        //     ->groupBy('users.panellist_id')
+        //     ->get();
+
+          return DB::table('users')
+          ->select('users.*','T1.fraudcount','T1.projectcode')
+          ->leftJoin(DB::raw('(SELECT panellist_id, '.DB::raw('COUNT(panellist_id) as fraudcount').','.DB::raw('GROUP_CONCAT(project_id) as projectcode').' FROM froud_users GROUP BY (panellist_id)
+                      ) as T1'), function ($join) {
+                          $join->on ('users.panellist_id', '=', 'T1.panellist_id' );
+                      })  
+            ->where('users.confirmed',"2")
+            //->where('users.unsubscribed',"0")
+           // ->where('users.is_blacklist',"0")
+            ->whereNull('users.deleted_at')
+            ->get();
+        }
+       
+        //return $roles;
+
+        //echo "<pre>";print_r($data);die;
+    }
+
+    public function getActiveUsersold()
+    {
+        
+        return $this->model
+            ->with(['roles' => function($q){
+                $q->where('role_id', '4');
+                }], 'permissions', 'providers')
+            ->active()
+            ->confirmed()
+            ->get();
+        //echo "<pre>";print_r($data);die;
+    }
+    /**
+     * @param int    $paged
+     * @param string $orderBy
+     * @param string $sort
+     *
+     * @return LengthAwarePaginator
+     */
+    public function getInactivePaginated($paged = 25, $orderBy = 'created_at', $sort = 'desc') : LengthAwarePaginator
+    {
+        return $this->model
+            ->with('roles', 'permissions', 'providers')
+            ->active(false)
+            ->orderBy($orderBy, $sort)
+            ->paginate($paged);
+    }
+
+    /**
+     * @param int    $paged
+     * @param string $orderBy
+     * @param string $sort
+     *
+     * @return LengthAwarePaginator
+     */
+    public function getDeletedPaginated($paged = 25, $orderBy = 'created_at', $sort = 'desc') : LengthAwarePaginator
+    {
+        return $this->model
+            ->with('roles', 'permissions', 'providers')
+            ->onlyTrashed()
+            ->orderBy($orderBy, $sort)
+            ->paginate($paged);
+    }
+
+    /**
+     * @param array $data
+     *
+     * @return User
+     * @throws \Exception
+     * @throws \Throwable
+     */
+    public function create(array $data) : User
+    {
+        return DB::transaction(function () use ($data) {
+            $user = parent::create([
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'email' => $data['email'],
+                'password' => $data['password'],
+                'active' => isset($data['active']) && $data['active'] == '1' ? 1 : 0,
+                'confirmation_code' => md5(uniqid(mt_rand(), true)),
+                'confirmed' => isset($data['confirmed']) && $data['confirmed'] == '1' ? 1 : 0,
+            ]);
+
+            // See if adding any additional permissions
+            if (! isset($data['permissions']) || ! count($data['permissions'])) {
+                $data['permissions'] = [];
+            }
+
+            if ($user) {
+                // User must have at least one role
+                if (! count($data['roles'])) {
+                    throw new GeneralException(__('exceptions.backend.access.users.role_needed_create'));
+                }
+
+                // Add selected roles/permissions
+                $user->syncRoles($data['roles']);
+                $user->syncPermissions($data['permissions']);
+
+                //Send confirmation email if requested and account approval is off
+                if (isset($data['confirmation_email']) && $user->confirmed == 0 && ! config('access.users.requires_approval')) {
+                    $user->notify(new UserNeedsConfirmation($user->confirmation_code));
+                }
+
+                event(new UserCreated($user));
+
+                return $user;
+            }
+
+            throw new GeneralException(__('exceptions.backend.access.users.create_error'));
+        });
+    }
+
+    /**
+     * @param User  $user
+     * @param array $data
+     *
+     * @return User
+     * @throws GeneralException
+     * @throws \Exception
+     * @throws \Throwable
+     */
+    public function update(User $user, array $data) : User
+    {
+        $this->checkUserByEmail($user, $data['email']);
+
+        // See if adding any additional permissions
+        if (! isset($data['permissions']) || ! count($data['permissions'])) {
+            $data['permissions'] = [];
+        }
+
+        return DB::transaction(function () use ($user, $data) {
+            if ($user->update([
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'email' => $data['email'],
+            ])) {
+                // Add selected roles/permissions
+                $user->syncRoles($data['roles']);
+                $user->syncPermissions($data['permissions']);
+
+                event(new UserUpdated($user));
+
+                return $user;
+            }
+
+            throw new GeneralException(__('exceptions.backend.access.users.update_error'));
+        });
+    }
+
+    /**
+     * @param User $user
+     * @param      $input
+     *
+     * @return User
+     * @throws GeneralException
+     */
+    public function updatePassword(User $user, $input) : User
+    {
+        if ($user->update(['password' => $input['password']])) {
+            event(new UserPasswordChanged($user));
+
+            return $user;
+        }
+
+        throw new GeneralException(__('exceptions.backend.access.users.update_password_error'));
+    }
+
+    /**
+     * @param User $user
+     * @param      $status
+     *
+     * @return User
+     * @throws GeneralException
+     */
+    public function mark(User $user, $status) : User
+    {
+        if (auth()->id() == $user->id && $status == 0) {
+            throw new GeneralException(__('exceptions.backend.access.users.cant_deactivate_self'));
+        }
+
+        $user->active = $status;
+
+        switch ($status) {
+            case 0:
+                event(new UserDeactivated($user));
+            break;
+
+            case 1:
+                event(new UserReactivated($user));
+            break;
+        }
+
+        if ($user->save()) {
+            return $user;
+        }
+
+        throw new GeneralException(__('exceptions.backend.access.users.mark_error'));
+    }
+
+    /**
+     * @param User $user
+     *
+     * @return User
+     * @throws GeneralException
+     */
+    public function confirm(User $user) : User
+    {
+        if ($user->confirmed) {
+            throw new GeneralException(__('exceptions.backend.access.users.already_confirmed'));
+        }
+
+        $user->confirmed = 1;
+        $confirmed = $user->save();
+
+        if ($confirmed) {
+            event(new UserConfirmed($user));
+
+            // Let user know their account was approved
+            if (config('access.users.requires_approval')) {
+                $user->notify(new UserAccountActive);
+            }
+
+            return $user;
+        }
+
+        throw new GeneralException(__('exceptions.backend.access.users.cant_confirm'));
+    }
+
+    /**
+     * @param User $user
+     *
+     * @return User
+     * @throws GeneralException
+     */
+    public function unconfirm(User $user) : User
+    {
+        if (! $user->confirmed) {
+            throw new GeneralException(__('exceptions.backend.access.users.not_confirmed'));
+        }
+
+        if ($user->id == 1) {
+            // Cant un-confirm admin
+            throw new GeneralException(__('exceptions.backend.access.users.cant_unconfirm_admin'));
+        }
+
+        if ($user->id == auth()->id()) {
+            // Cant un-confirm self
+            throw new GeneralException(__('exceptions.backend.access.users.cant_unconfirm_self'));
+        }
+
+        $user->confirmed = 0;
+        $unconfirmed = $user->save();
+
+        if ($unconfirmed) {
+            event(new UserUnconfirmed($user));
+
+            return $user;
+        }
+
+        throw new GeneralException(__('exceptions.backend.access.users.cant_unconfirm'));
+    }
+
+    /**
+     * @param User $user
+     *
+     * @return User
+     * @throws GeneralException
+     * @throws \Exception
+     * @throws \Throwable
+     */
+    public function forceDelete(User $user) : User
+    {
+        if (is_null($user->deleted_at)) {
+            throw new GeneralException(__('exceptions.backend.access.users.delete_first'));
+        }
+
+        return DB::transaction(function () use ($user) {
+            // Delete associated relationships
+            $user->passwordHistories()->delete();
+            $user->providers()->delete();
+            $user->sessions()->delete();
+
+            if ($user->forceDelete()) {
+                event(new UserPermanentlyDeleted($user));
+
+                return $user;
+            }
+
+            throw new GeneralException(__('exceptions.backend.access.users.delete_error'));
+        });
+    }
+
+    /**
+     * @param User $user
+     *
+     * @return User
+     * @throws GeneralException
+     */
+    public function restore(User $user) : User
+    {
+        if (is_null($user->deleted_at)) {
+            throw new GeneralException(__('exceptions.backend.access.users.cant_restore'));
+        }
+
+        if ($user->restore()) {
+            event(new UserRestored($user));
+
+            return $user;
+        }
+
+        throw new GeneralException(__('exceptions.backend.access.users.restore_error'));
+    }
+
+    /**
+     * @param User $user
+     * @param      $email
+     *
+     * @throws GeneralException
+     */
+    protected function checkUserByEmail(User $user, $email)
+    {
+        //Figure out if email is not the same
+        if ($user->email != $email) {
+            //Check to see if email exists
+            if ($this->model->where('email', '=', $email)->first()) {
+                throw new GeneralException(trans('exceptions.backend.access.users.email_error'));
+            }
+        }
+    }
+
+    public function getUserAnswersByUserIds($userIdsArray)
+    {
+        $userAnswers = UserAdditionalData::whereIn('uuid', $userIdsArray)->project([
+            'uuid' => true,
+            'u_id' => true,
+            'user_answers' => true,
+
+        ])->get();
+        return $userAnswers;
+    }
+
+    public function getUseCompleteData($userid=null,$profile_sections=[],$countryCode)
+    {
+        $exportData = array();
+        if($userid){
+            $user = $this->getById($userid);
+        }else{
+            $user = $this->getById(auth()->id());
+        }
+        /*echo '<pre>';
+        print_r($user);*/
+      /* $basicFields = $user->getUserBasicFields();
+        print_r($basicFields);die;*/
+       // $basicFields = array('first_name'=>'First Name','last_name'=>'Last Name','email'=>'Email','timezone'=>'Timezone','gender'=>'Gender','dob'=>'Date of Birth','zipcode'=>'Zipcode / Postcode','locale'=>'Locale','country_code'=>'Country Code','panellist_id'=>'Panellist Id');
+
+        $basicFields = array('panellist_id'=>'Panellist_Id','dob'=>'DOB','age'=>'Age','zipcode'=>'Zipcode','device_preference'=>'Device_Preference');
+
+        $get_user_Add_data = UserAdditionalData::where('uuid','=',$user->uuid)->first();
+        //echo '<pre>';
+       // print_r($get_user_Add_data);die;
+
+        if ($get_user_Add_data['user_answers']) {
+            //$user_answer = $get_user_Add_data->user_answers;
+        
+        
+            //$locale = Config::get('app.locale');
+            $locale = "en_".$countryCode;
+            $question_text = [];
+            foreach($get_user_Add_data['user_answers'] as $key=>$value){
+                
+                $profile_section_code = $value['profile_section_code'];
+                //use in_array()
+                if(!in_array($profile_section_code,$profile_sections)){
+                    continue;
+                }
+                //print_r($profile_section_code);
+                $question_code= $value['profile_question_code'];
+                if(is_array($value['selected_answer'])){
+                    $selectedAnswer = $value['selected_answer'];
+                }else{
+                    $selectedAnswer = explode(" ",$value['selected_answer']); 
+                }
+                $question_text[] = $this->getQuestionText($profile_section_code,$question_code,$locale,$selectedAnswer);
+            }
+            //die;
+            $exportData['Basic Profile']= [];
+            foreach($question_text  as $data){
+                foreach ($data as $key=>$value){
+                    $basicFields[$key] = $value;
+                }
+            }
+            foreach( $basicFields as $key => $value ){
+                if($key == 'dob'){
+                    $exportData['Basic Profile'][$value] = $user->$key->format('m-d-Y');
+                }else if ( $key == 'age' ){
+                    $exportData['Basic Profile'][$value] = Carbon::parse($user->dob)->age;
+                }else if ( $key == 'device_preference' ){
+                    $exportData['Basic Profile'][$value] = $this->getDevicePreferenceName($user->device_preference);
+                }else{
+                    if($user->$key){
+                        $exportData['Basic Profile'][$value] = $user->$key;
+                    }else{
+                        $exportData['Basic Profile'][$key] = $value;
+                    }
+                }
+
+            }
+            $exportData['Detailed Profile'] = [];
+            /*Todo Details profile has to be added*/
+            /* $userAnswers = UserAnswer::whereUserId($user->id)->with('question')->get();
+            foreach ($userAnswers as $userAnswer) {
+                $question = $userAnswer->question;
+
+                $answer = DetailedProfileRepository::getAnswerforQuestion($question, $userAnswer->user_answer);
+
+                $exportData['Detailed Profile'][$question->display_name] = $answer;
+            }*/
+                return $exportData;
+        }else{
+            $exportData['Basic Profile']= [];
+            $exportData['Detailed Profile'] = [];
+            return $exportData; 
+        }
+    }
+
+    /**
+     * This action is used for getting the User Question Details with their Answers.
+     *
+     * @param $fullName
+     *
+     * @return array
+     */
+
+    private function getQuestionText($profile_section_code,$question_code,$locale,$selected_answer)
+    {
+        $locale =explode('_',$locale);
+        $country = $locale[1];
+        $language = $locale[0];
+        $sectionProjection = ProfileSection::getProjectionArray($country, strtoupper($language));
+        $questionsProjection = ProfilerQuestions::getProjectionArray($country,strtoupper($language));
+        //print_r($questionsProjection);
+        $profile = ProfileSection::where('general_name', '=', $profile_section_code)->project($sectionProjection)->first();
+        if($profile_section_code!=="BASIC" && $profile_section_code!=="HIDDEN"){
+            $profileQuestion = ProfilerQuestions::where('profile_section_code', '=',$profile_section_code)
+                ->where('general_name','=',$question_code)
+                ->project($questionsProjection)
+                ->first();
+
+               
+            $profile->questions = $profileQuestion;            
+            $question_data = [];
+            if(!empty($profileQuestion->translated)){
+                foreach($profileQuestion->translated as $question){
+                    //$question_text = $question['text'];
+                    $question_text = $question_code;
+                    $answer_text = [];
+                    foreach($question['answers'] as $key=>$value){
+                        if(in_array($value['precode'],$selected_answer)){
+                            $answer_text[] = $value['display_name'];
+                        }
+                    }
+
+                    $question_data[$question_text] = implode('|',$answer_text);
+                }
+            }
+            
+           // print_r($question_data);die;
+           
+        }elseif($profile_section_code=="BASIC"&& $profile_section_code!=="HIDDEN") {
+            $profileQuestion = GlobalProfileQuestion::where('general_name','=',$question_code)
+                ->project($questionsProjection)
+                ->first();
+            $profile->questions = $profileQuestion;
+            
+            $question_data = [];
+            if(!empty($profileQuestion->translated)){
+                foreach($profileQuestion->translated as $question){
+                    //$question_text = $question['text'];
+                    $question_text = $question_code;
+                    $answer_text = [];
+                    if($question['answers']) {
+                        foreach ($question['answers'] as $key => $value) {
+                            if (in_array($value['precode'], $selected_answer)) {
+                                $answer_text[] = $value['display_name'];
+                            }
+                        }
+                    } else {
+                        $answer_text = $selected_answer;
+                    }
+                    $question_data[$question_text] = implode('|',$answer_text);
+                }
+            }
+           
+        } else {
+            $question_text = $question_code;
+            $answer_text[] = $selected_answer;
+            $question_data[$question_text] = implode('|',$selected_answer);
+        }
+      // print_r($question_data);//die;
+        return $question_data;
+    }
+
+    public function getDevicePreferenceName($devicePreference){
+        $devicepreference = [];
+        $deviceArray = explode(',',$devicePreference);
+        if(in_array("1", $deviceArray)){
+            $devicepreference[]="All Device";
+        }else{
+            foreach($deviceArray as $device){
+                if($device==2){
+                    $devicepreference[]="Desktop/Laptop";
+                }else if($device==3){
+                    $devicepreference[]="Mobile/Phone";
+                }else if($device==4){
+                    $devicepreference[]="Tablet";
+                }
+            }
+        }
+        
+        return implode(',',$devicepreference);
+    }
+
+    
+}
+>>>>>>> dev
