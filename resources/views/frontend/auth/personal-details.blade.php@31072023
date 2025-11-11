@@ -1,0 +1,1006 @@
+@extends('frontend.layouts.app')
+
+@section('title', app_name() . ' | '.__('labels.frontend.auth.register_box_title'))
+
+@push('after-styles')
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+
+
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.0/css/bootstrap.min.css"
+    rel="stylesheet" type="text/css" />
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css"> -->
+    <link href="{{asset('css2/style2.css')}}" rel="stylesheet">
+    <link href="{{asset('vendor/css/plugins/datapicker/bootstrap-datepicker.css')}}" rel="stylesheet">
+    <link href="{{asset('css2/bootstrap4.css')}}" rel="stylesheet" type="text/css" />
+    <link href="{{asset('css2/bootstrap.css')}}" rel="stylesheet">
+    <link href="{{asset('css2/bootstrap.min.css')}}" rel="stylesheet" type="text/css">
+    <link href="{{asset('css2/bootstrap.rtl.css')}}" rel="stylesheet">
+    <link href="{{asset('css2/bootstrap.rtl.min.css')}}" rel="stylesheet" type="text/css">
+    <link href="{{asset('css2/bootstrap-grid.css')}}" rel="stylesheet">
+    <link href="{{asset('css2/bootstrap-grid.min.css')}}" rel="stylesheet" type="text/css">
+    <link href="{{asset('css2/bootstrap-grid.rtl.css')}}" rel="stylesheet">
+    <link href="{{asset('css2/bootstrap-grid.rtl.min.css')}}" rel="stylesheet" type="text/css">
+    <link href="{{asset('css2/bootstrap-reboot.css')}}" rel="stylesheet">
+    <link href="{{asset('css2/bootstrap-reboot.min.css')}}" rel="stylesheet" type="text/css">
+    <link href="{{asset('css2/bootstrap-reboot.rtl.css')}}" rel="stylesheet">
+    <link href="{{asset('css2/bootstrap-reboot.rtl.min.css')}}" rel="stylesheet" type="text/css">
+    <link href="{{asset('css2/bootstrap-utilities.css')}}" rel="stylesheet">
+    <link href="{{asset('css2/bootstrap-utilities.min.css')}}" rel="stylesheet" type="text/css">
+    <link href="{{asset('css2/bootstrap-utilities.rtl.css')}}" rel="stylesheet" type="text/css">
+    <link href="{{asset('css2/bootstrap-utilities.rtl.min.css')}}" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css" />
+
+    <style>
+      .Spanish_fontsize{
+        padding: 2px !important;
+       font-size: 12px !important;
+      }
+#toast-container{
+  display: block;
+}
+.toast-error{
+  background-color: red !important;
+  color: #fff !important;
+  font-size: 12px !important;
+}
+.cc-window{
+  display: none;
+}
+.Languague{
+  display: none;
+}
+
+.all_language_list .Languague img{
+    position: absolute;
+    left: 21px;
+    height: 17px;
+    top: 8px;
+}
+
+   .gradient-custom-2 {
+/* fallback for old browsers */
+background: #006BDE;
+display: grid !important;
+
+}
+
+#contain-div-1{
+  border-radius: 10px 0px 0px 10px;
+}
+/*#proc .btn{
+  background-color: #24a0ed;
+  color:white;
+  font-size: 16px;
+  width: 85%;
+  margin-left: 9px;
+  margin-top: 45px;
+}*/
+#proc .btn{
+  background-color: #006BDE;
+  color:white;
+  font-size: 16px;
+/*  width: 85%;*/
+  margin-left: 9px;
+/*  margin-top: 45px;*/
+}
+/*  #datepicker{width:180px;}*/
+  #datepicker > span:hover{cursor: pointer;}
+
+ @media (min-width: 1340px) and (max-width: 1450px){
+#proc .btn {
+    width: 84% !important;
+} 
+}
+
+@media(min-width: 982px){
+  #proc .btn{
+    width: 85%;
+    margin-left: 9px;
+    margin-top: 45px !important;
+  }
+}
+    </style>
+
+@endpush
+
+@section('content')
+
+
+
+  <div id="container"><!-- main container starts-->
+    <div id="wrapp"><!-- main wrapp starts-->
+        <nav class="navbar navbar-expand-lg navbar-dark  static-top">
+          <div class="container Nav-div" >
+            <a class="navbar-brand" id="navbar-brand" href="#">
+              <img src="img/logo.png" alt="..." height="26">
+            </a>
+            <!--<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button> -->
+          
+            <span class="navbar-brand-2 " id="span-1"><span class="already"> {{__('frontend.index.contact_us.already_account')}}</span> <a href="{{url('/')}}/login" style="color: #006BDE;">
+              {{__('frontend.modes.email_auth.button')}}
+            </a></span>
+          </div>
+        </nav><!-- header ends-->
+        
+    </div>
+  </div>
+
+  <div id="line"></div>
+
+
+  <div class="container" style="margin-bottom: 10px;">
+    <section class="h-100 gradient-form">
+      <div class="container py-5 h-100" id="card">
+        <div class="row d-flex justify-content-center align-items-center h-100">
+          <div class="col-xl-12">
+            <div class="card rounded-3 text-black">
+              <div class="row g-0" width="25px">
+                      
+                <div class="col-lg-6  align-items-center gradient-custom-2" id="contain-div-1">
+                  <div class="text-white px-3 py-4 p-md-5 mx-md-4">
+                    <img src="img/login_user.png" class="image_center"/>
+                    <h4 class="mb-4 text_margin_style">{{__('frontend.index.contact_us.opinion')}}</h4>
+                    <p class="small mb-0 p_open">{{__('frontend.index.contact_us.join')}}<br />
+                      {{__('frontend.index.contact_us.join_1')}}</p>                
+                    <div class="row div_m" width="30px"><br>
+                      <div class="col-2 img-1" width="50px">
+                        <div class="icon_style">
+                          <img src="img/Vector.png" class="icon_padding_style " style="padding-top: 10px;" />
+                        </div>        
+                         <h2 class="icon_heading sign">{{__('frontend.index.contact_us.signup_for')}}</h2>        
+                      </div>
+      
+                            <div class="col-4  border-center img-2">
+                            <div class="icon_style"><img src="img/Group.png" class="icon_padding_style" style="padding-left: 14px;"/></div>
+                            <h2 class="icon_heading">{{__('frontend.index.how_it_works.title_subhead_4')}}</h2>
+                            </div>
+                            <div class="col-3 border-center2 img-3">
+                            <div class="icon_style"><img src="img/Group 70.png" class="icon_padding_style"/></div>
+                            <h2 class="icon_heading">{{__('frontend.index.contact_us.take_survey')}}</h2>
+                            </div>
+                            <div class="col-3 border-center3 re-image">
+                            <div class="icon_style"><img src="img/Vector-1.png" class="icon_padding_style" style="padding-left: 12px;"/></div>
+                            <h2 class="icon_heading">{{__('frontend.index.contact_us.redeem_rewards')}} </h2>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                  
+            
+                      <div class="col-lg-6 div_m_t centerr-div" id="center-div">
+                        <div class="card-body p-md-5 mx-md-4">
+                          <div class="row" id="div_mt">
+                            <div class=" col-lg-9">                 
+                              <h4 class="mt-1 Register_text_style regi" id="register">{{__('frontend.index.contact_us.personal_details')}}</h4>
+                            </div>
+                            <div class="col-lg-3">                  
+                              <h4 class="mt-1 Register_text_style regis">
+
+                      <!-- <li class="dropdown language_dropdown"> -->
+                         <!-- <div class="blink_me_other">{{__('frontend.nav.static.binker')}} <span class="glyphicon glyphicon-arrow-right"></span></div> -->
+                        <!-- <a class="dropdown-toggle" id="language-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                            <i class="fas fa-globe"></i>
+                            @if(!empty($currentLanguage)) {{$currentLanguage->language_code}} @endif
+                            <i class="fas fa-caret-down"></i>
+                        </a> -->
+                       <ul class="dropdown-menu dropdown-menu-right all_language_list" aria-labelledby="language-button" style="width:100px ;">
+                            <li class="dropdown-header" style="display:none !important">
+                                @if(!empty($country_code)) {{--$country_code->display_name--}}{{$country_code}} - EN (Selected) @endif
+                            </li>
+                            <div class="" style=" text-transform: uppercase;">
+                                {{--US--}}
+                               {{-- <li role="separator" class="divider"></li> --}}
+                               {{--
+                                <li class="dropdown-header">{{__('frontend.nav.static.language_1')}}</li>
+                                <li><a class="#" href="/lang/en_US">{{__('frontend.nav.static.language_2')}}</a></li>
+                                <li><a href="/lang/es_US">{{__('frontend.nav.static.language_3')}}</a></li>
+                                --}}
+                                <div id="US" class="Languague">
+                                <img src="img/USA.png" >
+                                <li class="dropdown-header">US</li>
+                                <li><a class="#" href="/lang/en_US">{{__('ENGLISH ')}}</a></li>
+                                <li><a href="/lang/es_US">{{__('frontend.nav.static.language_spanish')}} </a></li>
+                               </div>
+                                
+                                {{--CA--}}
+                                 <div id="CA" class="Languague">
+                                <img src="img/CANADA.png" >
+                                <!-- <li role="separator" class="divider"></li> -->
+                                <li class="dropdown-header">CA</li>
+                                <li><a class="#" href="/lang/en_CA">{{__('ENGLISH ')}}</a></li>
+                                <li><a class="#" href="/lang/fr_CA">{{__('frontend.nav.static.language_french')}} </a></li></div>
+
+                                {{--ES--}}
+                                 <div id="ES" class="Languague">
+                                <img src="img/SPAIN.png" >
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">ES</li>
+                                <li><a class="#" href="/lang/en_ES">{{__('ENGLISH ')}}</a></li>
+                                <li><a class="#" href="/lang/es_ES">{{__('frontend.nav.static.language_spanish')}} </a></li>
+                              </div>
+
+                                {{--DE--}}
+                                <div id="DE" class="Languague">
+                                <img src="img/GERMANY.png" >
+                                <!-- <li role="separator" class="divider"></li> -->
+                                <li class="dropdown-header">DE</li>
+                                <li><a class="#" href="/lang/en_DE">{{__('ENGLISH ')}}</a></li>
+                                <li><a class="#" href="/lang/de_DE">{{__('frontend.nav.static.language_german')}} </a></li>
+                              </div>
+
+                                {{--AU--}}
+                                <div id="AU" class="Languague">
+                                <img src="img/AUSTRALIA.png" >
+                                <!-- <li role="separator" class="divider"></li> -->
+                                <li class="dropdown-header">AU</li>
+                                <li><a class="#" href="/lang/en_AU">{{__('ENGLISH ')}}</a></li>
+                              </div>
+                            
+                                {{--UK--}}
+                                <div id="UK" class="Languague">
+                                <img src="img/UNITED KINGDOM.png" >
+                                <!-- <li role="separator" class="divider"></li> -->
+                                <li class="dropdown-header">UK</li>
+                                <li><a class="#" href="/lang/en_UK">{{__('ENGLISH ')}}</a></li>
+                                <li>&nbsp;</li>
+                              </div>
+
+                                {{--FR--}}
+                                <div id="FR" class="Languague">
+                                <img src="img/FRANCE.png" s>
+                                <!-- <li role="separator" class="divider"></li> -->
+                                <li class="dropdown-header">FR</li>
+                                <li><a class="#" href="/lang/en_FR">{{__('ENGLISH ')}}</a></li>
+                                <li><a class="#" href="/lang/fr_FR">{{__('frontend.nav.static.language_french')}} </a></li>
+                              </div>
+
+                                {{--IT--}}
+                                <div id="IT" class="Languague">
+                                <img src="img/ITALY.png" >
+                                <!-- <li role="separator" class="divider"></li> -->
+                                <li class="dropdown-header">IT</li>
+                                <li><a class="#" href="/lang/en_IT">{{__('ENGLISH ')}}</a></li>
+                                <li><a class="#" href="/lang/it_IT">{{__('frontend.nav.static.language_italian')}} </a></li>
+                              </div>
+
+                                {{--IN--}}
+                                <div id="IN" class="Languague">
+                                <img src="img/INDIA.png">
+                                <!-- <li role="separator" class="divider"></li> -->
+                                <li class="dropdown-header">IN</li>
+                                <li><a class="#" href="/lang/en_IN">{{__('ENGLISH ')}}</a></li>
+                                <li><a class="#" href="/lang/hi_IN" style="left: -49px !important;">{{__('frontend.nav.static.language_hindi')}} </a></li></div>
+
+                                {{--CN--}}
+                                <div id="CN" class="Languague">
+                                <img src="img/CHINA.png" >
+                                <!-- <li role="separator" class="divider"></li> -->
+                                <li class="dropdown-header">CN</li>
+                                <li><a class="#" href="/lang/en_CN">{{__('ENGLISH ')}}</a></li>
+                                <li><a class="#" href="/lang/zh_CN">{{__('frontend.nav.static.language_chinese')}} </a></li>
+                                <li>&nbsp;</li></div>
+                            </div>
+                        </ul>
+                    <!-- </li> -->
+
+                    <!-- <img id="img_01" src="img/Group 57.png" />  -->
+                   
+
+                    {{--<div class="dropdown-toggle" id="img_01" data-toggle="dropdown">
+                      <img id="selected_country" src="img/{{$flags}}.png" style="border: 1px solid #DCDCDC; "/>
+                      <span id="selected_country_code"></span>
+                      <span id="selected_language"></span>
+                    </div>--}}
+                    <img id="img_01" class="dropdown-toggle" id="language-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" src="img/{{$flags}}.png" style="border: 1px solid #DCDCDC; " />
+                            </h4>
+                          </div>
+                          
+                        </div>
+
+                <!-- <form action="{{url('/')}}/personal-details" method="POST"> -->
+                  
+                 @csrf
+                 {{ html()->form('POST', route('frontend.auth.personal-details.post'))->class('registration_form')->open() }} 
+                  <input type="hidden" name="zip_check" id="zip_check" value="0">
+                 <input type="hidden" name="email" id="email" value="{{$email}}">
+                 <input type="hidden" name="create_password" value="{{$password}}">
+                 <input type="hidden" id="requestid" name="rid"  value="{{$uuid}}" />
+                                <input type="hidden" id="eventid" name="eid" value="{{$ip}}" />
+                                <input type="hidden" id="cc" value="{{$country_code}}" />
+                                <input type="hidden" id="dfiq_check" name="dfiq_check" value="{{$dfiq}}">
+                 <input type="hidden" name="gender" id="gender" value="" required>
+            <div class="form-outline mb-4">                
+              <div class="row" >
+                <div class="col-6 col-12 col-md-6 col-xs-12 f_name"> <label class="form-label form_label_style firstname" for="form2Example11" style="opacity: 0.7;">{{(__('validation.attributes.frontend.first_name'))}}*</label>
+                  <input type="text" id="f-name" maxlength="20" class="form-control fname"
+                     name="firstname" value="{{old('firstname')}}" onkeyup="validateFname()" required />
+                     <span id="fname-error" class="error"></span>
+                          @if($errors->has('firstname'))
+                          <div class="text-danger">{{ $errors->first('firstname')}}</div>
+                          @endif
+                </div>
+                <!-- <span id="fname-error" class="error"></span> -->
+                      
+                <div class="col-6 col-12 col-md-6 col-xs-12 l_name"> <label class="form-label form_label_style lastname" for="form2Example11" style="opacity: 0.7;">{{(__('validation.attributes.frontend.last_name'))}}*</label>
+                  <input type="text" id="l-name" maxlength="20" class="form-control lname"
+                     name="lastname" value="{{old('lastname')}}" onkeyup="validateLname()" required />
+                     <span id="lname-error" class="error"></span>
+                          @if($errors->has('lastname'))
+                          <div class="text-danger">{{ $errors->first('lastname')}}</div>
+                          @endif
+                </div>  
+                                 
+              </div>                    
+            </div>
+
+            <!-- <div class="form-outline mb-4">                
+              <div class="" >        
+                <div class="l-name"> <label class="form-label form_label_style lastname" for="form2Example11">Last Name*</label>
+                  <input type="text" id="form2Example11" class="form-control lname"
+                    placeholder="danny" />
+                </div>  
+                                 
+              </div>                    
+            </div> -->
+               
+            
+
+                  <div class="form-outline mb-4" id="gen_da">
+                 <div class="row">
+                 <div class="col-lg-6 col-md-6"> 
+                 <label class="form-label form_label_style gender" for="form2Example11" style="opacity: 0.7;">{{__('frontend.register.static.gender')}}*</label>
+                  <div class="row gend">
+                    
+                    <div class="col-6 col-md-6" onclick="testFunction('male')">
+                    
+                      <input type="button" value="{{__('frontend.register.static.gender_male')}}"  id="form2Example11" class="form-control icon_img_style btn-male btn-gender @if(__('frontend.register.static.gender_male')=='Masculino') Spanish_fontsize @endif" placeholder="Male"/>
+                        </div>
+                        
+                        <div class="col-6 col-md-6" onclick="testFunction('female')">
+
+                        <input type="button" value="{{__('frontend.register.static.gender_female')}}" id="form2Example11" class="form-control icon_img_style2  btn-gender btn-female @if(__('frontend.register.static.gender_male')=='Masculino') Spanish_fontsize @endif"
+                        placeholder="Female"/>
+                        
+                        </div>
+                        <span id="gender-error" class="error"></span>
+                          @if($errors->has('gender'))
+                          <div class="text-danger">{{ $errors->first('gender')}}</div>
+                          @endif
+ 
+                        </div>                       
+                        
+                        </div>
+                          
+                      
+                      <div class="col-lg-6 col-md-6" id="date_div"> 
+                        <label class="form-label form_label_style" for="form2Example11" style="opacity: 0.7;">{{__('frontend.index.contact_us.date')}}*</label>
+<!--                          <input type="date" id="form2Example11" class="form-control date_div"
+                           name="date" value="{{old('date')}}"/>  -->
+                              <div id="datepicker"
+                                class="input-group date"
+                                data-date-format="mm-dd-yyyy" onclick="zipRemove()">
+                                <input class="form-control date_div cst-form-date @if(__('frontend.register.static.gender_male')=='Masculino') Spanish_fontsize @endif"
+                                  type="text" readonly id="form2Example11" style="background: white;cursor: pointer;" name="date" required />
+                                <span class="input-group-addon date_group" style="background:white;width:17%;padding-left: 18px;">
+                                  <!-- <i class="glyphicon glyphicon-calendar"></i> -->
+                                  <i class="fa fa-calendar"></i>
+                                </span>
+                                <!-- <span id="date-error" class="error"></span> -->
+                              </div>
+                          @if($errors->has('date'))
+                          <div class="text-danger">{{ $errors->first('date')}}</div>
+                          @endif
+                      </div>
+
+                      <div class="form-outline mb-4">                
+                        <!-- <div class="" >        
+                          <div class="date"> <label class="form-label form_label_style dat" for="form2Example11">Date of Birth*</label>
+                            <input type="date" id="form2Example11" class="form-control lname"
+                              placeholder="danny" name="date"/>
+                          </div>  
+                                           
+                        </div>                     -->
+                      </div>
+                      
+                      </div>
+                  </div>
+                  
+                   <div class="form-outline mb-4 zipp">
+                  <label class="form-label form_label_style zi @if(__('frontend.register.static.gender_male')=='Masculino') Spanish_fontsize @endif" for="form2Example11" style="opacity: 0.7;">{{__('frontend.index.contact_us.zip')}}*</label>
+                    <input type="text" id="zip" class="form-control zip"
+                      placeholder="" name="zip" value="{{old('zip')}}" onkeyup="validateZip()" required />
+                      <span id="zip-error" class="error"></span>
+                          @if($errors->has('zip'))
+                          <div class="text-danger">{{ $errors->first('zip')}}</div>
+                          @endif
+                  </div>
+                  
+<!--                    <div class="form-outline mb-4 countryy">
+                  <label class="form-label form_label_style countr" for="form2Example11">Country & Language*</label>
+                    <select class="form-control form-select country" id="country-op" name="country_name" value="{{old('country_name')}}">
+                    
+                    <option >Australia&nbsp;</option>
+                    <option >Canada&nbsp;</option>
+                    <option >China&nbsp;</option>
+                    <option >France&nbsp;</option>
+                    <option >Germany&nbsp;</option>
+                    <option >India&nbsp;</option>
+                    <option >Italy&nbsp;</option>
+                    <option >Spain&nbsp;</option>
+                    <option selected>United States&nbsp;</option>
+                    <option >United Kingdom&nbsp;</option>
+                </select>
+                          @if($errors->has('country_name'))
+                          <div class="text-danger">{{ $errors->first('country_name')}}</div>
+                          @endif
+                  </div> -->
+
+                  @if( !empty($countries) )
+                  <div class="form-outline mb-4" id="count_lan">
+                    <div class="row">
+                      <div class="col-6 col-12 col-md-6 col-xs-12 countryy">
+                        <label class="form-label form_label_style countr" for="form2Example11" style="opacity: 0.7;">
+                        {{(__('frontend.register.static.country'))}}*</label>
+                          <select class="form-control form-select country" id="country" name="country_name" value="{{old('country_name')}}" required>
+                            <!-- <option selected>Country&nbsp;</option> -->
+                            <!-- <option >United States&nbsp;</option>
+                            <option >Canada&nbsp;</option>
+                            <option >China&nbsp;</option>
+                            <option >France&nbsp;</option>
+                            <option >Germany&nbsp;</option>
+                            <option >India&nbsp;</option>
+                            <option >Italy&nbsp;</option>
+                            <option >Spain&nbsp;</option>
+                            <option selected>United Kingdom&nbsp;</option>
+                            <option >Australia &nbsp;</option> -->
+
+                                                    @foreach($countries as $country)
+                                                        <option @if($country->country_code==@$country_code) selected @endif value="{{$country->country_code}}" >{{$country->country_name}}</option>
+                                                        {{--<option value="{{$country->id}}" {{ ($country->country_code == $country_code)?'selected="true"':'' }}>{{$translatedCountry->name}}</option>--}}
+                                                    @endforeach
+                          </select>
+                          <span id="country-error" class="error"></span>
+                          @if($errors->has('country_name'))
+                          <div class="text-danger">{{ $errors->first('country_name')}}</div>
+                          @endif
+                      </div>
+                      <div class="col-6 col-12 col-md-6 col-xs-12 language-opt">
+                        <label class="form-label form_label_style countr" for="form2Example11" style="opacity: 0.7;">{{(__('frontend.register.static.language'))}}*</label>
+                          <select class="form-control form-select country" id="language" name="language" required>
+                           <option>English</option>
+                          </select>
+                          <span id="language-error" class="error"></span>
+
+                      </div>
+                    </div>
+                  </div>
+                  @endif
+
+                
+<!-- 
+                  <div class="pt-1 mb-5 pb-1" style="margin-bottom:0px!important;" >
+                    <button class="btn btn-primary btn-block fa-lg gradient-custom-2 mb-3"  type="submit" style="">
+
+                        <a class="Submit_text" >Submit</a>
+                      </button> -->
+                                        <div class="pt-1 mb-5 pb-1" style="" id="proc">
+                    <button class="btn-style btn mb-3" type="submit" id="submit" style="" onclick="return testInputValidate(event)">
+                     {{__('frontend.index.contact_us.submit')}}
+                    </button>
+
+                    <!-- <button class="btn-style btn mb-3" type="submit"  style="">
+                     Back
+                    </button> -->
+                    
+                    <h2 class="icon_heading_3" style="color: #006BDE"><a href="{{ route('frontend.auth.register') }}">{{__('frontend.modes.email_auth.back')}}</a></h2>
+                    
+                  </div>
+
+                </form>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+</section>
+
+ </div>   
+   
+
+   <footer class="footer_style" style="background:#E6E6E6;">
+    <div class="container">
+        <div class="row text-center">
+            <div class="pull-left col-lg-6 col-xs-12 d-none d-md-block " style="text-align:start !important">
+                <p><a href="#" style="color: black;" class="copyright">{{__('frontend.index.footer.links.copyright_sj')}}</a></p>
+            </div>
+            <div class="col-lg-6 col-lg-offset-4 col-xs-12">
+              <div class="pull_right_style">
+                <p style="padding-right: 2px;">
+                  <a href="{{ route('frontend.cms.privacy') }}" class="policies" style="color: black;">{{__('frontend.index.contact_us.consent_3')}}</a> <span class=""> | </span>
+                  <a href="{{ route('frontend.cms.cookie') }}" class="" style="color: black;">{{__('frontend.index.footer.links.cookie_policy')}}</a> <span class=""> | </span>
+                  <a href="{{ route('frontend.cms.rewards_policy') }}" class=" pol" style="color: black;">{{__('frontend.index.footer.links.reward_policy')}}</a> <span cl
+                  class=" pol"> | </span> 
+                  <a href="{{ route('frontend.cms.referral_policy') }}" class=" pol" style="color: black;">{{__('frontend.index.footer.links.referral_policy')}}</a> <span cl
+                  class=" pol"> | </span> 
+                  <a href="{{ route('frontend.cms.safeguard') }}" class="Policy" style="color: black;">{{__('frontend.index.footer.links.Safeguards')}}</a> <span cl
+                  class="policy"> | </span> 
+                  <a href="{{ route('frontend.cms.term_condition') }}"  style="color: black;" class="terms policy"> 
+                    {{__('frontend.index.footer.links.term_condition')}}</a> <span cl
+                    class="policy"> | </span> 
+                    <a href="{{ route('frontend.cms.faq') }}" style="color: black;" class="policy">{{__('frontend.index.footer.links.FAQ')}}</a></p>
+              </div>
+            </div>
+             <div class="pull-left col-lg-6 col-xs-12 d-sm-none mt-3">
+                <p><a href="#" style="color: black;" class="copyright">{{__('frontend.index.footer.links.copyright_sj')}}</a></p>
+            </div>
+        </div>
+    </div>
+</footer>
+
+
+
+@php
+
+       if($country_code=='UK'){
+       $countryCode="GB";
+       }else{
+         $countryCode=$country_code;
+       }
+       
+@endphp
+  
+@endsection
+
+
+@push('after-styles')
+<style>
+
+    .form-group {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-control-placeholder {
+        position: absolute;
+        top: 0;
+        padding: 7px 0 0 13px;
+        transition: all 200ms;
+        opacity: 0.5;
+    }
+/*.form-control:required:valid + .form-control-placeholder, .form-control:optional:not([value=""]):not(:focus) + .form-control-placeholder, */
+    .form-control:focus + .form-control-placeholder, .form-control + .form-control-placeholder {
+        font-size: 75%;
+        transform: translate3d(0, -100%, 0);
+        opacity: 1;
+    }
+
+
+    .emsg{
+        border: 1px solid red;
+    }
+</style>
+@endpush
+@push('after-scripts')
+    @if (config('access.captcha.registration'))
+        {!! Captcha::script() !!}
+    @endif
+<script type="text/javascript" id="forensic_script_id" src="https://api-cdn.dfiq.net/scripts/forensic-v4.0.1.min.js" data-key="29109E607D0B6E11DE0B966F50EA617A-5004-1" data-nc></script>
+<!-- Date range use moment.js same as full calendar plugin -->
+<script src="{{asset('vendor/js/plugins/fullcalendar/moment.min.js')}}"></script>
+
+<!-- Data picker -->
+<script src="{{asset('vendor/js/plugins/datapicker/bootstrap-datepicker.js')}}"></script>
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js"></script>
+    <script src="https://use.fontawesome.com/b9bdbd120a.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+<script>
+  $(document).ready(function(e){ 
+    $('.btn').prop('disabled','true');
+    //$('[data-toggle="tooltip"]').tooltip();
+  $('.arrowpopup').mouseover(function(){
+   var tt = document.getElementById("tooltipdemo");
+   console.log(tt);
+  tt.classList.toggle("show");
+  })
+  });</script>
+
+
+<script>
+fetchLanguage('{{$country_code}}')
+var fnameError = document.getElementById('fname-error');
+var lnameError = document.getElementById('lname-error');
+var zipError = document.getElementById('zip-error');
+
+function validateFname(){
+  // alert("hello");
+    var fName = document.getElementById('f-name').value;
+    if(fName.length == 0){
+        fnameError.innerHTML = '{{(__('validation.attributes.frontend.first_name1'))}}';
+        return false;
+    }
+    if(!fName.match(/^[A-Za-z]+$/)){
+      fnameError.innerHTML = '{{(__('validation.attributes.frontend.first_name1'))}}';
+      return false;
+    }
+    let occ_count = 0;
+    if(fName.length > 2){
+      for(let i = 0; i < fName.length; i++){
+        if(countString(fName, fName[i]).length != 0){
+          fnameError.innerHTML = '{{(__('validation.attributes.frontend.first_name4'))}}';      
+            return false;
+        }
+      }
+    
+    }
+    fnameError.innerHTML = '';
+    return true;
+}
+function countString(str, letter) {
+    let count = 0;
+  let arr_counts = [];
+    // looping through the items
+    for (let i = 0; i < str.length; i++) {
+
+        // check if the character is at that position
+        if (str.charAt(i) == letter && str.charAt(i+1) == letter && str.charAt(i+2) == letter && str.charAt(i+3) != null) {
+            count += 1;
+            arr_counts.push(count);
+
+        }
+
+      }
+      return arr_counts;
+  }
+function validateLname(){
+  // alert("hello");
+    var lName = document.getElementById('l-name').value;
+    if(lName.length == 0){
+        lnameError.innerHTML = '{{(__('validation.attributes.frontend.last_name1'))}}';
+        return false;
+    }
+    if(!lName.match(/^[A-Za-z]+$/)){
+      lnameError.innerHTML = '{{(__('validation.attributes.frontend.first_name1'))}}';
+      return false;
+    }
+    lnameError.innerHTML = '';
+    return true;
+}
+
+function validateZip(){
+ 
+  // alert("hello");
+    var zipCode = document.getElementById('zip').value;
+    if(zipCode.length == 0){
+        zipError.innerHTML = '{{(__('validation.attributes.frontend.zip_code1'))}}';
+        return false;
+    }
+    // if(!zipCode.match(/^[0-9]{5}(?:-[0-9]{4})?$/)){
+    //   zipError.innerHTML = 'Enter valid zip code';
+    //   return false;
+    // }
+    zipError.innerHTML = '';
+     return true;
+}
+
+function testFunction(gender) {
+  var la = gender;
+  // alert(la);
+  return la;
+}
+
+var temp = testFunction();
+if(temp == ''){
+  alert('Submit gender');
+}
+
+function testInputValidate(e){
+  console.log("click");
+ 
+  const dateInput = document.querySelector('.cst-form-date').value;
+
+  // console.log(dateInput);
+
+  var agearr = dateInput.split('-');
+
+  var birthDate = agearr[2] +'-'+ agearr[0] +'-'+ agearr[1];
+
+  var ua = getAge(birthDate); 
+  const submitButton = document.getElementById('submit');
+  // var alldates = document.querySelectorAll('');
+  if(ua < 13){
+    Message="{{(__('validation.attributes.frontend.is_age'))}}";
+    //submitButton.disabled = true;
+    setTimeout(function() {
+      toastr.error(Message, '' );
+        }, 400);
+
+    return false;                            
+
+
+  }else{
+
+    //dateerr.innerHTML = " ";
+
+    return true;
+
+  }
+ return true;
+}
+
+
+const getAge = birthDate => Math.floor((new Date() - new Date(birthDate).getTime()) / 3.15576e+10);
+
+
+
+function zipRemove(){
+
+//document.querySelector('.zip').value = " ";
+
+
+}
+
+const firstnameInput = document.getElementById('f-name');
+const lastnameInput = document.getElementById('l-name');
+const zipInput = document.getElementById('zip');
+const submitButton = document.getElementById('submit');
+
+//firstnameInput.addEventListener('input', validateForm);
+//lastnameInput.addEventListener('input', validateForm);
+//zipInput.addEventListener('input', validateForm);
+
+function validateForm() {
+  // if(!passwordInput.value.includes(confirmPasswordInput.value){
+  //   alert("passowrd and confirm pssword are not same");
+  // }
+    // alert("disable");
+   /* if(!validateZip() || !validateLname() || !validateFname()){
+    submitButton.disabled = true;
+    return false;
+  }
+  else{
+    submitButton.disabled = false;
+    
+  }*/
+}
+
+
+
+ 
+$(document).on('click','.btn-gender',function(){
+  $('.btn-gender').removeClass('genderChange');
+  $('#gender').val($(this).val());
+         if($(this).val()=="{{__('frontend.register.static.gender_male')}}"){
+          classname="icon_img_style1";
+          //$('.btn-gender').removeClass('icon_img_style3');
+         $(this).removeClass('icon_img_style');
+         $('.btn-female').removeClass('icon_img_style3');
+          $('.btn-female').addClass('icon_img_style2');
+         }
+         
+        
+         if($(this).val()=="{{__('frontend.register.static.gender_female')}}"){
+          classname="icon_img_style3";
+          $(this).removeClass('icon_img_style2');
+          $('.btn-male').removeClass('icon_img_style1');
+          $('.btn-male').addClass('icon_img_style');
+         }
+      if($(this).hasClass('genderChange')){
+      $(this).removeClass('genderChange');
+      }else{
+      $(this).addClass('genderChange');
+       $(this).addClass(classname);
+       }
+  
+       });
+
+    
+
+
+    $('select#country').on('change',function(e){
+        var country_code = $('select#country').val();
+        fetchLanguage(country_code)
+    });
+
+    function fetchLanguage(country_code)
+    {
+       var countryName={};
+       countryName['US']='USA.png';
+       countryName['CA']='CANADA.png';
+       countryName['AU']='AUSTRALIA.png';
+       countryName['ES']='SPAIN.png';
+       countryName['DE']='GERMANY.png';
+       countryName['UK']='UNITED KINGDOM.png';
+       countryName['IN']='INDIA.png';
+       countryName['FR']='FRANCE.png';
+       countryName['IT']='ITALY.png';
+
+       $("#"+country_code).show();
+       country_flag=countryName[country_code];
+       //$('#img_01').attr('src','img/'+country_flag);
+
+        var header = {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
+        }
+        if(!country_code || country_code == 0){
+            return false;
+        }
+        axios.get("{{route('frontend.auth.language')}}",{
+            params:{
+                country_code: country_code,
+            }
+        }).then(function (response) {
+            if(response.status === 200){
+                $select = $('#language');
+                $select.find('option').remove();
+                var lang = response.data;
+                $.each(lang, function (value, name) {
+                    $select.append($('<option />', {value: value, text: name}));
+                });
+            }
+        }).catch(function (error) {
+            // handle error
+        }).then(function () {
+            // always executed
+            console.log('always executed');
+        });
+    }
+    $('.registration_form .form-control').blur(function() {
+         var info = $("#zip").val();
+         var id=$(this).attr('id');
+         if(id=='zip'){
+          var dfiq_check=$("#dfiq_check").val();
+          if(dfiq_check==1 && info!='')
+          {
+            invokeAPI(info);  
+          } 
+        }        
+       
+    });
+    $(document).on('click','#submit',function(){
+
+      if($('#zip_check').val()==0){
+         var dfiq_check=$("#dfiq_check").val();
+         if(dfiq_check==1){
+          return false;
+         }
+         else{
+          return true;
+        }
+        
+      }
+      return true;
+    })
+
+    function invokeAPI(info) {
+                var zipCode = document.getElementById('zip').value;
+                console.log(zipCode);
+                //return false;
+                var req = document.getElementById("requestid").value;
+                var event = document.getElementById("eventid").value;
+                var country = document.getElementById("cc").value;
+                var utm_source="SjPanelRegister";
+                //$('#form-dispaly').hide();
+               // $('.loader').show();
+                var uniquenessParam = Forensic.createUniquenessParam(event,null, false);
+                var geoParam = Forensic.createGeoParam(country,zipCode);
+                Forensic.forensic(req, successCallback, errorCallback, uniquenessParam, geoParam, null, null, utm_source);
+            }
+             function successCallback(jsonData) {
+                var FlagStatus=false;
+                var Message='';
+                console.log(jsonData);
+               // $('#form-dispaly').hide();
+               // $('.loader').show();
+                /*$.ajaxSetup({
+                headers: {
+                 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                }
+                });*/
+                var email=$('#email').val();
+                var ip_address=$('#eventid').val();
+                var panelistId=$('#requestid').val();
+                $.ajax({
+                    url: "{{ route('frontend.auth.register.dfiqData.post') }}",
+                    type: 'GET',
+                    data: {datajsondata:jsonData,email:email,ip_address:ip_address,panelistId:panelistId,user_id:''},
+                    success: function(response){
+                       // window.location=addressBar+"&DFIQ=true";
+                    }, 
+                    async: true
+                    });
+
+                if (jsonData.forensic.marker.score > 26 ||  jsonData.forensic.unique.isEventUnique == false){
+                    console.log("fraud score >= 25 or not unique"); // Add your logic to handle non-fraud/unique
+
+                    if(jsonData.forensic.marker.isGeoPostal == false  && FlagStatus==false){
+                        Message="{{(__('validation.attributes.frontend.is_geopostal'))}}";
+                        FlagStatus=true;
+                    }
+                   /* if(jsonData.forensic.marker.isBot == true  && FlagStatus==false){
+                        Message="{{(__('validation.attributes.frontend.is_bot'))}}";
+                        FlagStatus=true;
+                    }
+                    
+                    if(jsonData.forensic.marker.isAnonymous == true  && FlagStatus==false){
+                        Message="{{(__('validation.attributes.frontend.is_anonymous'))}}";
+                        FlagStatus=true;
+                    }
+                    if(jsonData.forensic.marker.isGeoTz == false  && FlagStatus==false){
+                        Message="{{(__('validation.attributes.frontend.is_geotz'))}}";
+                        FlagStatus=true;
+                    }
+                    if(jsonData.forensic.marker.isTampered == true  && FlagStatus==false){
+                        Message="{{(__('validation.attributes.frontend.is_tampered'))}}";
+                        FlagStatus=true;
+                    }
+                    if(jsonData.forensic.unique.isEventUnique == false  && FlagStatus==false){
+                        Message="{{(__('validation.attributes.frontend.is_event'))}}";
+                        FlagStatus=true;
+                    }*/
+                }
+                console.log(FlagStatus);
+                console.log(Message);
+                
+                if(FlagStatus==true){
+                    setTimeout(function() {
+                                toastr.error(Message, '' );
+                                }, 400);
+                    $('.btn').prop('disabled','true');
+                    $('#zip_check').val(0);
+                 }else{
+                    $('#zip_check').val(1);
+                    $('.btn').removeAttr('disabled','false');
+                    //$('#submit').click();
+
+                 }
+            };
+            function errorCallback(jsonData) {
+                console.log(jsonData.error.message); // Add your logic to handle errors
+            }
+// });
+
+</script>
+
+  <script src="https://code.jquery.com/jquery-3.6.1.min.js"
+    integrity=
+  "sha256-o88AwQnZB+VDvE9tvIXrMQaPlFFSUTR+nldQm1LuPXQ="
+    crossorigin="anonymous">
+  </script>
+  <script>
+    $(function () {
+      $("#datepicker").datepicker({
+        autoclose: true,
+        todayHighlight: true,
+      }).datepicker('update', new Date());
+    });
+  </script>
+  <script src=
+"https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js"
+    integrity=
+"sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+    crossorigin="anonymous">
+  </script>
+  <script src=
+"https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js"
+    integrity=
+"sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+    crossorigin="anonymous">
+  </script>
+  <script src=
+"https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js">
+  </script>
+
+@endpush

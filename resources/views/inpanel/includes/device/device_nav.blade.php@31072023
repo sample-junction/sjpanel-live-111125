@@ -1,0 +1,52 @@
+<div class="col-2 mt-4 text-start ps-0  position-fixed d-none d-lg-block vertical-scrollable" id="style-5" style="background: #ffffff;overflow-y: scroll;height: 100%;">
+
+              <ul style="list-style-type: none;">  
+
+                    <li class="mt-4 mb-2  @yield('dashboard_select')" ><a href="{{ route('inpanel.dashboard') }}" class="side-menu-li mx-2" style="text-decoration: none;@if(auth()->user()->locale!='en_US')font-size: 12px !important; @endif"><span>
+                        <img src="{{asset('images/DashboardBoldIcon.png')}} " width="15px" class="img-fluid me-3" alt=""></span> {{__('inpanel.nav.dashboard')}}  </a></li>
+
+                    <li class="mt-4 mb-2 @yield('myAccount_select')"><a href="{{ route('inpanel.user.profile.preference.show', 'basic-profile') }}" class="side-menu-li mx-2" style="text-decoration: none;@if(auth()->user()->locale!='en_US')font-size: 12px !important; @endif"><span>
+					
+					@if(trim($__env->yieldContent('myAccount_select')))
+					<img src="{{asset('images/My Account Bolc Icon.png')}}" width="15px" style="margin-right: 20px !important" class="img-fluid me-3" alt="">
+					@else
+					<img src="{{asset('images/My Account Icon.png')}}" width="15px" style="margin-right: 20px !important" class="img-fluid me-3" alt="">
+						@endif
+					</span>{{__('inpanel.nav.my_account')}}  </a></li>
+
+                    <li> <hr class="cst-space"> </li>
+
+                    <li class="mt-4 mb-2"><a href="@if(Route::has('inpanel.profiler.show')){{ route('inpanel.profiler.show') }}@endif" class="side-menu-li mx-2" style="text-decoration: none;@if(auth()->user()->locale!='en_US')font-size: 12px !important; @endif"><span><img src="{{asset('images/Detailed Profile Icon.png')}}" width="15px" class="img-fluid me-3" alt=""></span>  {{__('inpanel.nav.detailed_profile')}} </a></li>
+
+                    @php
+
+                    if(@session()->get('surveys')!=0){
+                        $count_sr=1;
+                    }else{
+                         $count_sr=0;
+                    }
+
+                    @endphp
+                    <li class="mt-4 mb-2"><a href="@if(Route::has('inpanel.survey.index')){{ route('inpanel.survey.index') }}@endif" class="side-menu-li mx-2" style="text-decoration: none;@if(auth()->user()->locale!='en_US')font-size: 12px !important; @endif"><span><img src="{{asset('images/Surveys Icon.png')}}" width="15px" class="img-fluid me-3" alt=""></span> {{__('inpanel.nav.surveys')}}</a> @if($count_sr!=0)
+                        <span><img src="{{asset('images/Ellipse 3.png')}}" alt="" style="transform:translateX(35px)"></span>
+                     @endif </li>
+
+                    <li> <hr class="cst-space"> </li>
+
+                    <li class="mt-4 mb-2"><a href="@if(Route::has('inpanel.reward.show')){{ route('inpanel.reward.show') }}@endif" class="side-menu-li mx-2" style="text-decoration: none;@if(auth()->user()->locale!='en_US')font-size: 12px !important; @endif"><span><img src="{{asset('images/My Points Icon.png')}}" width="15px" class="img-fluid me-3" alt=""></span> {{__('inpanel.nav.label.reward_points')}} </a></li>
+
+                    <li class="mt-4 mb-2"><a href="@if(Route::has('inpanel.redeem.show')){{ route('inpanel.redeem.show') }}@endif" class="side-menu-li mx-2" style="text-decoration: none;@if(auth()->user()->locale!='en_US')font-size: 12px !important; @endif"><span><img src="{{asset('images/Points redemption Icon.png')}}" width="15px" class="img-fluid me-3" alt=""></span> {{__('inpanel.nav.label.redeem_points')}} </a></li>
+
+                    <li class="mt-4 mb-2"><a href="@if(Route::has('inpanel.invite.show')){{ route('inpanel.invite.show') }}@endif" class="side-menu-li mx-2" style="text-decoration: none;@if(auth()->user()->locale!='en_US')font-size: 12px !important; @endif"><span><img src="{{asset('images/Refer a friend Icon.png')}}" width="15px" class="img-fluid me-3" alt=""></span>  {{__('inpanel.nav.label.refer')}}  </a></li>
+
+                    <li> <hr class="cst-space"> </li>
+                    
+                    <li class="mt-4 mb-2"><a href="{{route('frontend.cms.help_support')}}" class="side-menu-li mx-2" style="text-decoration: none;@if(auth()->user()->locale!='en_US')font-size: 12px !important; @endif"><span><img src="{{asset('images/Panelist Support Icon.png')}}" width="15px" class="img-fluid me-3" alt=""></span> {{__('inpanel.nav.panelist_support')}}  </a></li>
+
+                    <li class="mt-4 mb-4"><a href="{{route('frontend.cms.faq')}}" class="side-menu-li mx-2" style="text-decoration: none;@if(auth()->user()->locale!='en_US')font-size: 12px !important; @endif"><span><img src="{{asset('images/FAQ Icone.png')}}" width="15px" class="img-fluid me-3" alt=""></span> {{__('inpanel.nav.label.faq')}}  </a></li>
+                    <li>&nbsp;</li>
+                    <li>&nbsp;</li>
+                </ul>
+
+            </div>
+      

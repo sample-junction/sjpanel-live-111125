@@ -1,0 +1,5 @@
+<?php
+
+return [
+    "" => "Registration is currently closed."
+];

@@ -1,0 +1,31 @@
+{
+    "name": "samplejunction/custombootstrapform",
+    "description": "Custom Package to extend watson BootstrapForm for sjpanel implementation",
+    "type": "extensplugin",
+    "require": {
+        "watson/bootstrap-form": "^1.1"
+    },
+    "authors": [
+        {
+            "name": "Pankaj Jha",
+            "email": "pankajj@samplejunction.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "Samplejunction\\CustomBootstrapForm\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Samplejunction\\CustomBootstrapForm\\CustomBootstrapFormProvider"
+            ],
+            "aliases": {
+                "CustomBootForm": "Samplejunction\\CustomBootstrapForm\\Facades\\CustomBootstrapForm"
+            }
+        }
+    }
+
+}

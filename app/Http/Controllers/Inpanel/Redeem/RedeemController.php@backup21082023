@@ -1,0 +1,202 @@
+<?php
+
+namespace App\Http\Controllers\Inpanel\Redeem;
+
+use App\Events\Inpanel\Auth\UserRedeemRequest;
+use App\Models\Profiler\UserAdditionalData;
+use App\Models\Redeem\RequestRedeem;
+use App\Models\RedeemOption;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Auth;
+use App\Models\Auth\User;
+use App\Repositories\Inpanel\Redeem\RedeemRepository;
+use App\Http\Requests\Inpanel\RedeemPoints\RedeemRequest;
+use Freshbitsweb\Laratables\Laratables;
+use App\Models\Setting\Setting;
+use Carbon;
+
+
+/**
+ * This class is used for handling all the Redeem Requests made by the Users.
+ *
+ * Class RedeemController
+ * @author Pankaj Jha
+ * @author Akash Sharma
+ * @access public
+ * @package App\Http\Controllers\Inpanel\Redeem\RedeemController
+ */
+
+class RedeemController extends Controller
+{
+
+    /**
+     * @param $redeemRepo RedeemRepository
+     */
+    public $redeemRepo;
+
+    /**
+     * RedeemController constructor.
+     *
+     * @param RedeemRepository $redeemRepo
+     */
+    public function __construct(RedeemRepository $redeemRepo)
+    {
+        $this->redeemRepo = $redeemRepo;
+    }
+
+    /**
+     * This action is used to redirect the User to the view of Redeem Index Page
+     *
+     * As the user is redirected to the Redeem Index page and he has crossed the threshold limit
+     * he would be able to send the redeem request but if not than he would see the locked
+     * redeem requests page
+     *
+     * @return resource redeem/index.blade.php
+     */
+
+    public function index()
+    {
+        $user = Auth::user();
+      // date_default_timezone_set($user->timezone);
+       /* $userPoints = $user->point()->first();*/
+        $userPoints = UserAdditionalData::where('uuid','=',$user->uuid)->first();
+        $userCountryId = $user->country;
+        $redeemOptions = RedeemOption::where('status', '=', 'active')
+            ->where('country_id','=',240)->get();
+        //$threshold_value = config('app.points.metric.threshold_points');
+        $getThresholdValue = setting::where('key','=','PANEL_REDEEMPTIOM_THRESHOLD_POINTS')->first();
+        $threshold_value = $getThresholdValue->value;
+        if(empty($userPoints)){
+            $userPoints = false;
+            $userpoint = false;
+        }else{
+            $userpoint = $userPoints->user_points;
+        }
+        $redeem_requests = RequestRedeem::where('user_uuid','=',$user->uuid)->where('status','=','pending')->first();
+        $gift_cards = RedeemOption::where('country_code','=',$user->country_code)->get();
+        $get_user_add_data = UserAdditionalData::where('uuid','=',$user->uuid)->first();
+        $tour_detail = isset($get_user_add_data->user_tour_taken) ? $get_user_add_data->user_tour_taken : 0;
+        $tour_taken=0;
+        if($tour_detail){
+            foreach ($tour_detail as $key => $value){
+                if($value['section']=='redeem-points' && $value['taken']==true){
+                    $tour_taken=1;
+                }
+            }
+        }
+        if(!empty($redeem_requests)){
+            $redeemValue = RequestRedeem::laratablesCustomValue($redeem_requests);
+        }else{
+            $redeemValue = "";
+        }
+        //$multiplypoint =  config('settings.redeemRequestCondition.check_multiply');
+        $getmultiplyValue = setting::where('key','=','PANEL_REDEEMPTIOM_MULTIPLY_POINTS')->first();
+        $multiplypoint = $getmultiplyValue->value;
+        return View('inpanel.redeem.index')
+            ->with('userPoints', $userpoint)
+            ->with('redeemOptions', $redeemOptions)
+            ->with('threshold_point',$threshold_value)
+            ->with('redeem_requests',$redeem_requests)
+            ->with('redeemValue',$redeemValue)
+            ->with('gift_cards',$gift_cards)
+            ->with('tour_taken',$tour_taken)
+            ->with('multiplypoint',$multiplypoint)
+            ->with('user',$user);
+    }
+
+     public function getRedeemHistory()
+    {
+        $user = Auth::user();
+
+       /* $userPoints = $user->point()->first();*/
+      //  $userPoints = UserAdditionalData::where('uuid','=',$user->uuid)->first();
+      //  $userCountryId = $user->country;
+      //  $redeemOptions = RedeemOption::where('status', '=', 'active')->where('country_id','=',240)->get();
+       // $threshold_value = config('app.points.metric.threshold_points');
+        // if(empty($userPoints)){
+        //     $userPoints = false;
+        //     $userpoint = false;
+        // }else{
+        //     $userpoint = $userPoints->user_points;
+        // }
+        $redeem_requests = RequestRedeem::where('user_uuid','=',$user->uuid)->get();
+      //  $gift_cards = RedeemOption::where('country_code','=',$user->country_code)->get();
+      //  $get_user_add_data = UserAdditionalData::where('uuid','=',$user->uuid)->first();
+      //  $tour_detail = isset($get_user_add_data->user_tour_taken) ? $get_user_add_data->user_tour_taken : 0;
+        // $tour_taken=0;
+        // if($tour_detail){
+        //     foreach ($tour_detail as $key => $value){
+        //         if($value['section']=='redeem-points' && $value['taken']==true){
+        //             $tour_taken=1;
+        //         }
+        //     }
+        // }
+        return View('inpanel.redeem.redeemhistory')
+          //  ->with('userPoints', $userpoint)
+           // ->with('redeemOptions', $redeemOptions)
+            ->with('redeem_requests',$redeem_requests)
+          //  ->with('gift_cards',$gift_cards)
+          //  ->with('tour_taken',$tour_taken)
+          ;
+    }
+
+    public function dataTableRedeemHistory()
+    {    
+        $user = Auth::user();
+       date_default_timezone_set($user->timezone);
+       $data= Laratables::recordsOf(RequestRedeem::class, function($query)
+        {
+            $user = Auth::user();
+            return $query->where('user_uuid','=',$user->uuid)->whereNotNull('coupon_redeemed')->orderBy('created_at','DESC');
+        });
+      
+       return $data;
+    }
+
+    /**
+     * This action is used to put the redeem requests by the User.
+     *
+     * SendRedeemRequest action for sending thr request
+     * for redeem points to the admin and Super Admin and
+     * sending the mail to the user, admin & super admin
+     * and also check that User has requested points that is less than his total points
+     *
+     *
+     * @param RedeemRequest $request
+     * @return mixed
+     */
+    public function sendRedeemRequest(RedeemRequest $request)
+    {
+        $user = Auth::user();
+        //Set Default Time Zone By Ramesh Kamboj//
+        //date_default_timezone_set($user->timezone);
+        //End Here//
+        $input = $request->except(['_token']);
+        $redeem_points = $request->input('request_points',false);
+       // $redeem_method = $request->input('redeem_method',false);
+        if (!$redeem_points) {
+            return \Redirect::back()
+                ->withFlashDanger("Please Provide the details for redeem points");
+        }
+        $user_uuid= $user->uuid;
+        $user_add_data = UserAdditionalData::where('uuid','=',$user_uuid)->first();
+        $user_points = $user_add_data->user_points;
+        $total_points = $user_points['completed'];
+        $data = [
+            'redeem_points' => $redeem_points,
+           // 'redeem_method' => $redeem_method,
+              'redeem_method' => 'Select from rybbon reward page',
+        ];
+        if($redeem_points <= $total_points){
+            $create_redeem_request = $this->redeemRepo->createRedeemRequest($user_uuid,$total_points,$data);
+            event(new UserRedeemRequest($user,$create_redeem_request));
+            return \Redirect::back()
+                ->withFlashSuccess(__('inpanel.redeem.success'));
+        } else {
+            return \Redirect::back()
+                ->withFlashDanger(__('inpanel.redeem.error'));
+        }
+    }
+
+}

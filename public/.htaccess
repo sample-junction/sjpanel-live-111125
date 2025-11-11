@@ -1,0 +1,74 @@
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Redirect non-www to www and ensure HTTPS
+    RewriteCond %{HTTP_HOST} ^sjpanel\.com$ [NC]
+    RewriteRule ^(.*)$ https://www.sjpanel.com/$1 [L,R=301]
+
+    # Serve WebP Images If Available
+    RewriteCond %{HTTP_ACCEPT} image/webp
+    RewriteCond %{REQUEST_FILENAME} (.+)\.(jpe?g|png)$
+    RewriteCond %{DOCUMENT_ROOT}/%1.webp -f
+    RewriteRule (.+)\.(jpe?g|png)$ $1.webp [T=image/webp,E=webp,L]
+
+    <IfModule mod_headers.c>
+        Header append Vary Accept env=webp
+        Header append Vary "Accept-Encoding"
+    </IfModule>
+
+    # Cache Static Files for Faster Loading
+    <IfModule mod_expires.c>
+        ExpiresActive On
+        ExpiresByType text/css "access plus 1 month"
+        ExpiresByType application/javascript "access plus 1 month"
+        ExpiresByType application/x-javascript "access plus 1 month"
+        ExpiresByType image/jpeg "access plus 1 year"
+        ExpiresByType image/png "access plus 1 year"
+        ExpiresByType image/webp "access plus 1 year"
+        ExpiresByType image/gif "access plus 1 year"
+        ExpiresByType image/svg+xml "access plus 1 year"
+        ExpiresByType font/woff "access plus 1 year"
+        ExpiresByType font/woff2 "access plus 1 year"
+        ExpiresByType font/ttf "access plus 1 year"
+        ExpiresByType font/eot "access plus 1 year"
+        ExpiresByType font/otf "access plus 1 year"
+        ExpiresByType application/font-woff "access plus 1 year"
+        ExpiresByType application/vnd.ms-fontobject "access plus 1 year"
+        ExpiresByType application/x-font-ttf "access plus 1 year"
+        ExpiresByType application/x-font-opentype "access plus 1 year"
+    </IfModule>
+
+    # Enable Gzip Compression for Faster Loading
+    <IfModule mod_deflate.c>
+        AddOutputFilterByType DEFLATE text/css text/javascript application/javascript application/x-javascript application/json
+        AddOutputFilterByType DEFLATE text/html text/plain text/xml
+        AddOutputFilterByType DEFLATE application/xml application/xhtml+xml application/rss+xml
+        AddOutputFilterByType DEFLATE image/svg+xml
+        AddOutputFilterByType DEFLATE font/woff font/woff2 font/ttf font/eot
+    </IfModule>
+
+    # Enable Brotli Compression (if supported)
+    <IfModule mod_brotli.c>
+        SetOutputFilter BROTLI_COMPRESS
+        AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/xml text/css text/javascript application/javascript application/x-javascript application/json application/xml application/rss+xml image/svg+xml
+        AddOutputFilterByType BROTLI_COMPRESS font/woff font/woff2 font/ttf font/eot
+    </IfModule>
+
+    # Handle Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>

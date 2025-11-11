@@ -1,0 +1,685 @@
+<?php
+
+namespace App\Http\Controllers\Inpanel\User;
+
+use App\Events\Inpanel\Auth\UserLoggedIn;
+use App\Events\Inpanel\Auth\UserProfilePicPoint;
+use App\Events\Inpanel\Auth\UserTour;
+use App\Exceptions\GeneralException;
+use App\Http\Requests\Inpanel\User\Profile\UpdatePreferenceRequest;
+use App\Models\Auth\User;
+use App\Models\Profiler\UserAdditionalData;
+use App\Repositories\Frontend\Auth\UserRepository;
+use Carbon\Carbon;
+use DateTime;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Response;
+use Laravel\Socialite\Facades\Socialite;
+use App\Helpers\Inpanel\Auth\Socialite as SocialiteHelper;
+use Illuminate\Support\Facades\Mail;
+use App\Models\Support\PanellistSupport;
+use App\Models\Support\SupportChat;
+
+/**
+ * This class is used for handling Update Preferences.
+ *
+ * Class ProfileController
+ * @author Pankaj Jha
+ * @author Akash Sharma
+ * @access public
+ * @package App\Http\Controllers\Inpanel\User\ProfileController
+ */
+
+class ProfileController extends Controller
+{
+
+    /**
+     * @param $userRepository
+     * @param UserRepository
+     */
+    protected $userRepository;
+    public $socialiteHelper;
+
+    /**
+     * ProfileController constructor.
+     *
+     * @param UserRepository $userRepository
+     * @param SocialiteHelper $socialiteHelper
+     */
+    public function __construct(UserRepository $userRepository, SocialiteHelper $socialiteHelper)
+    {
+        $this->userRepository = $userRepository;
+        $this->socialiteHelper = $socialiteHelper;
+    }
+
+    /*Has to Remove this action after checking the use of this action.*/
+
+    public function index()
+    {
+        return view('inpanel.user.profile.index')
+            ->with('user', auth()->user());
+    }
+
+    /**
+     * This action is used show the Preference Details that has to be updated by
+     * redirecting to the view of Profile Preferences Page.
+     *
+     * @param $name
+     * @return resource profile/preferences.blade.php
+     */
+
+    public function showPreference($name)
+    {
+        $get_user_add_data = UserAdditionalData::where('uuid','=',auth()->user()->uuid)->first();
+
+        return view('inpanel.user.profile.preference')
+            ->with('user', auth()->user())
+            ->with('user_add_data',$get_user_add_data);
+    }
+
+    /**
+     * This action used to create Function with different updated Preference Name.
+     *
+     * @param UpdatePreferenceRequest $request
+     * @return mixed
+     */
+    public function updatePreference(UpdatePreferenceRequest $request)
+    {
+        $functionName = camel_case('execute ' . $request->input('section'));
+        
+        if (!method_exists($this, $functionName)) {
+            abort(403, 'Unauthorized action.');
+        }
+        //print_r($functionName);exit;
+        return $this->$functionName($request);
+    }
+
+    /**
+     * This action use to update Basic Profile data that contain first_name, last_name, gender,
+     * DOB and also add Profile Photo. As soon user will do the update it will also be updated
+     * in user additional data and also for the first time uploading the profile photo user will
+     * get achievements points.
+     *
+     * @param $request
+     * @return mixed
+     */
+    public function executeBasicProfile($request)
+    {
+
+        //print_r($request->input('device_preference'));exit;
+        $image_name = null;
+        $user = auth()->user();
+        if ($request->hasFile('images')) {
+            $image = $request->file('images');
+            $image_name = time() . '.' . $image->getClientOriginalExtension();
+            $destinationPath = public_path('img');
+            $image->move($destinationPath, $image_name);
+            $this->userRepository->giveProfilePicUploadPoints($user);
+        } else {
+            $image_name = auth()->user()->image_url;
+        }
+
+        $user_id = $request->user()->id;
+        $profileInputs = $request->only('first_name', 'middle_name', 'last_name','gender','dob', 'email', 'avatar_type', 'avatar_location', 'timezone' , 'two_fact_auth','fb','twitter','linkdin');
+        $profileInputs['image_url'] = $image_name;
+        //$profileInputs['dob'] = DateTime::createFromFormat('m-d-Y', $profileInputs['dob'])->format('Y-m-d');
+        if(!empty($request->get('device_preference'))){
+            $profileInputs['device_preference'] = implode(',',$request->input('device_preference'));
+        }else{
+            $profileInputs['device_preference'] = '1,2,3,4';
+        }
+        //Code Added By Ramesh Kamboj For Social Profile Link Points//
+         $user_uuid= $request->user()->uuid;
+        
+        $updated_user_add_data = UserAdditionalData::where('uuid','=',$user_uuid)->first();
+        $fetch_user_achievement = $updated_user_add_data->user_achievement;
+            $user_achievement_facebook = [];
+            $user_achievement_twitter = [];
+            $user_achievement_linkedin = [];
+            $points_data_facebook = [];
+            $points_data_twitter = [];
+            if($fetch_user_achievement){
+                if(empty(array_column($fetch_user_achievement,"social_filled_facebook_profile"))) {
+                          if(!empty($request->get('fb'))){
+                            $points_data_facebook["code"] = 'Facebook';
+                            $points_data_facebook["points"] = '100';
+                            $points_data_facebook["status"] = "completed";
+                            $points_data_facebook["updated_at"] = date('Y/m/d H:m:s');
+                            $user_achievement_facebook['social_filled_facebook_profile'][] = $points_data_facebook;
+                            $updated_user_add_data->push("user_achievement", $user_achievement_facebook);
+                            $this->logProfileAchievementActivity($user,$points_data_facebook);
+                        }
+                        
+                    }
+                    if(empty(array_column($fetch_user_achievement,"social_filled_twitter_profile"))) {
+                         if(!empty($request->get('twitter'))){
+                            $points_data_twitter["code"] = 'Twitter';
+                            $points_data_twitter["points"] = '100';
+                            $points_data_twitter["status"] = "completed";
+                            $points_data_twitter["updated_at"] = date('Y/m/d H:m:s');
+                            $user_achievement_twitter['social_filled_twitter_profile'] []= $points_data_twitter;
+                            $updated_user_add_data->push("user_achievement", $user_achievement_twitter);
+                            $this->logProfileAchievementActivity($user,$points_data_twitter);
+                        }
+                        }
+                        if(empty(array_column($fetch_user_achievement,"social_filled_linkdin_profile"))) {
+                            if(!empty($request->get('linkdin'))){
+                            $points_data["code"] = 'Linkdin';
+                            $points_data["points"] = '100';
+                            $points_data["status"] = "completed";
+                            $points_data["updated_at"] = date('Y/m/d H:m:s');
+                            $user_achievement_linkedin['social_filled_linkdin_profile'][] = $points_data;
+                            $updated_user_add_data->push("user_achievement", $user_achievement_linkedin);
+                            $this->logProfileAchievementActivity($user,$points_data);
+                        }
+                        }
+                        //$updated_user_add_data->push("user_achievement", $user_achievement);
+                   // $this->logProfileAchievementActivity($user,$points_data);
+                        //return true;
+                }
+            
+            //End HERE//
+
+        $output = $this->userRepository->update($user_id, $profileInputs);
+        /*$user = auth()->user();
+
+        if($user->two_fact_auth==0 && array_key_exists('two_fact_auth',$profileInputs) && $profileInputs['two_fact_auth']==1){
+            $google2fa = app('pragmarx.google2fa');
+            $registration_data["google2fa_secret"] = $google2fa->generateSecretKey();
+            $request->session()->flash('registration_data', $registration_data);
+            $QR_Image = $google2fa->getQRCodeInline(
+                config('app.name'),
+                $user->email,
+                $registration_data['google2fa_secret']
+            );
+            return view('frontend.auth.google2fa.index', ['user' => $user,'QR_Image' => $QR_Image, 'secret' => $registration_data['google2fa_secret']]);
+        }*/
+        // E-mail address was updated, user has to reconfirm
+        if (is_array($output) && !empty($output['email_changed'])) {
+            auth()->logout();
+
+            return redirect()->back()->withFlashSuccess(__('strings.frontend.user.email_changed_notice'));
+        }
+        return redirect()->back()->withFlashSuccess(__('strings.frontend.user.profile_updated'));
+    }
+
+    /**
+     * This action use to update Password without asking the old password.
+     *
+     * @param $request
+     * @return mixed
+     * @throws GeneralException if the user new password and confirm password is not matched.
+     */
+    public function executePassword($request)
+    {
+
+        $user = $request->user();
+        $inputs = $request->only('password');
+        $inputs['password'] = Hash::make($inputs['password']);
+        $inputs['old_password'] = $user->password;
+
+        $output = $this->userRepository->updatePasswordWithoutOld($inputs);
+        return redirect()->back()->withFlashSuccess(__('strings.frontend.user.profile_updated'));
+
+    }
+
+    /**
+     * This action use to get User Details in CSV Format and the details will include basic profile data
+     * questions and their answers for all the detailed profile.
+     *
+     * @param $request
+     * @return \Symfony\Component\HttpFoundation\StreamedResponse
+     */
+    public function executeMyData($request)
+    {
+        /*
+         * To DO
+         * Convert this method into a Background Job
+         * After finishing the job Send Data through mail
+         * Only if Email is confirmed
+         * */
+
+        $date = date("m-d-Y");
+
+        $file_name = 'SJ Panel User Report '.$date;
+
+        $headers = array(
+            "Content-type" => "text/csv",
+            "Content-Disposition" => "attachment; filename={$file_name}.csv",
+            "Pragma" => "no-cache",
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
+            "Expires" => "0"
+        );
+
+
+        $userAllData = $this->userRepository->getUseCompleteData();
+
+        // print_r($basicData);echo '<pre>';
+        //print_r($userAllData);die;
+
+        $basicData = $userAllData['Basic Profile'];
+        $detailedProfileData = $userAllData['Detailed Profile'];
+        $basicColumns = array_keys($basicData);
+
+        $detailedProfileColumns = array_keys($detailedProfileData);
+
+        $basicColumns = array_merge($basicColumns, $detailedProfileColumns);
+
+        $basicData = array_merge($basicData, $detailedProfileData);
+
+       
+
+
+        $callback = function() use ($basicData, $basicColumns)
+        {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $basicColumns);
+
+            fputcsv($file, $basicData);
+
+            fclose($file);
+        };
+
+        return Response::stream($callback, 200, $headers);
+    }
+
+
+    /**
+     * added below funtion by dushyant on 30-6-2022
+     * This action Use to Soft Delete the Personal Info of User.
+     *
+     * @param $request
+     * @return mixed
+     */
+    public function executeDeletePersoninfo($request)
+    {
+        // echo '<pre>';
+        // print_r($request->input('delete_reason'));die;
+       // $user_uuid= $request->user()->uuid;
+       // $user = UserAdditionalData::where('uuid','=',$user_uuid)->first();
+       // if(isset($user->uuid) ){
+           // $user->delete();
+            $users = auth()->user();
+            $userdata = $users->toArray();
+           // print_r($userdata);die;
+            $address = config('mail.from.privacy_address');
+            $name = config('mail.from.name');
+
+            //Update Delete Reason
+            User::where('id',$userdata['id'])->update(['delete_reason'=>$request->input('delete_reason')]);
+            
+            Mail::send('frontend.mail.userinfo_confirmation_delete_mail', $userdata, function($message) use ($userdata, $address, $name) {
+                $message->to($userdata['email'], $userdata['first_name'])->subject(__('exceptions.frontend.auth.confirmation.userinfodeleteconfirm'));
+                $message->from($address, $name);
+             });
+       // }
+        return redirect()->route('inpanel.dashboard')->withFlashSuccess(__('Account Personal Info Delete Confirmation Mail Sent! Please check.'));
+        
+        //$this->userRepository->deleteUser();
+        
+       
+    }
+
+    /**
+     * This action Use to send confirmation mail to Deactivate the Account of User.
+     * dushyant dogra 16 july 2022
+     * @param $request
+     * @return mixed
+     */
+    public function executeDeleteAccount($request)
+    {
+
+        // echo '<pre>';
+        // print_r($request->input('deactive_reason'));die;
+		$users = auth()->user();
+		$user = $users->toArray();
+		$userdata = $user;
+		$address = config('mail.from.donotreply_address');
+		$name = config('mail.from.name');
+
+		//update deactivate reason
+        User::where('id',$userdata['id'])->update(['deactivate_reason'=>$request->input('deactive_reason')]);
+        
+        Mail::send('frontend.mail.confirmation_delete_mail', $user, function($message) use ($user,$userdata, $address, $name) {
+            $message->to($userdata['email'], $userdata['first_name'])->subject(__('exceptions.frontend.auth.confirmation.deleteconfirm'));
+            $message->from($address, $name);
+         });
+        return redirect()->route('frontend.index')->withFlashSuccess(__('Account Deactivation Confirmation Mail Sent! Please check.'));
+    }
+    /**
+     * This action Use to Soft Delete the Account of User.
+     *
+     * @param $request
+     * @return mixed
+     */
+   /* public function executeDelete($request)
+    {
+        $user_uuid= $request->user()->uuid;
+        $user = UserAdditionalData::where('uuid','=',$user_uuid)->first();
+        $user->delete();
+        $this->userRepository->deleteUser();
+
+        return redirect()->route('frontend.index')->withFlashSuccess(__('Account Deleted'));
+    }*/
+
+    /**
+     * Action use to Unsubscribe the mail id.
+     *
+     * @return mixed
+     */
+    public function executeUnsubscribeComplete()
+    {
+        return redirect()->back()->withFlashSuccess('Successfully Unsubscribed');
+    }
+
+    public function executeEmailSchedule($request)
+    {
+        $user = auth()->user();
+        $user_id = $request->user()->id; 
+        //print_r($request->input());exit;
+        $profileInputs['email_ratio'] = $request->input('email_ratio');
+
+        $output = $this->userRepository->update($user_id, $profileInputs);
+
+        // E-mail address was updated, user has to reconfirm
+        if (is_array($output) && !empty($output['email_changed'])) {
+            auth()->logout();
+
+            return redirect()->back()->withFlashSuccess(__('strings.frontend.user.email_changed_notice'));
+        }
+        return redirect()->back()->withFlashSuccess(__('strings.frontend.user.profile_updated'));
+    }
+
+
+    public function consentRevoke(Request $request)
+    {
+        $user = auth()->user();
+        $consent_type = $request->type;
+        $userAddData = UserAdditionalData::where('uuid', '=', $user->uuid)->first();
+        $user_consents = isset($userAddData->user_consents) ? $get_user_add_data->user_consents: [];
+        //$userConsent = $userAddData->user_consents;
+
+        foreach ($userConsent as $index => $data) {
+            if($data['consent_type']==$consent_type){
+               $data['consent_revoked'] = true;
+               $data['consent_revoked_at'] = date('Y/m/d H:i:s');
+               $userConsent[$index] = $data;
+               break;
+            }
+        }
+        $userAddData->user_consent_revoke = $userConsent;
+        $userAddData->save();
+        return Redirect::back()
+            ->withFlashSuccess('Consent Revoked');
+    }
+    /*  public function socialLogin(Request $request, $provider)
+      {
+          $user = null;
+          if (! in_array($provider, $this->socialiteHelper->getAcceptedProviders())) {
+              return redirect()->route(home_route())->withFlashDanger(__('auth.socialite.unacceptable', ['provider' => $provider]));
+          }
+          if (! $request->all()) {
+              return $this->getAuthorizationFirst($provider);
+          }
+          try {
+              $user = $this->userRepository->findOrCreateProvider($this->getProviderUser($provider), $provider);
+              dd($user);
+          } catch (GeneralException $e) {
+              return redirect()->route(home_route())->withFlashDanger($e->getMessage());
+          }
+      }
+      protected function getAuthorizationFirst($provider)
+      {
+          $socialite = Socialite::driver($provider);
+          $scopes = empty(config("services.{$provider}.scopes")) ? false : config("services.{$provider}.scopes");
+          $with = empty(config("services.{$provider}.with")) ? false : config("services.{$provider}.with");
+          $fields = empty(config("services.{$provider}.fields")) ? false : config("services.{$provider}.fields");
+          if ($scopes) {
+              $socialite->scopes($scopes);
+          }
+
+          if ($with) {
+              $socialite->with($with);
+          }
+
+          if ($fields) {
+              $socialite->fields($fields);
+          }
+          $redirect_url = route('inpanel.user.profile.preference.social','facebook');
+          $socialite->redirectUrl($redirect_url);
+          return $socialite->redirect();
+      }
+
+      protected function getProviderUser($provider)
+      {
+          return Socialite::driver($provider)->user();
+      }*/
+
+    public function verifyOTPGenerated(Request $request)
+    {
+        $user = auth()->user();
+        $request->merge(session('registration_data'));
+        // Call the default laravel authentication
+        $user->google2fa_secret = $request->google2fa_secret;
+        $user->save();
+        return response()->json(['status'=>true]);
+    }
+
+    private function registerTwoFactorAuth($user,$data)
+    {
+        return redirect()->route('inpanel.dashboard')
+            ->withFlashSuccess(__('inpanel.user.profile.preferences.two_fact.success_messages'));
+    }
+
+    public function twoFactSetting(Request $request)
+    {
+        $user = auth()->user();
+        $user->two_fact_auth = 1;
+        $user->save();
+        echo"success";
+        /*if($user->two_fact_auth==0){
+            $google2fa = app('pragmarx.google2fa');*/
+            
+            /*$registration_data["google2fa_secret"] = $google2fa->generateSecretKey();*/
+           /* $registration_data["google2fa_secret"] = $google2fa->generateSecretKey();
+
+
+            if(session()->get('registration_data')){
+                $request->session()->forget('registration_data');
+                session()->put('registration_data', $registration_data);
+            }else{
+                session()->put('registration_data', $registration_data);
+            }*/
+            /*$request->session()->flash('registration_data', $registration_data);*/
+            /*echo $url = $this->getQRCodeUrl(
+                config('app.name'),
+                $user->email,
+                $registration_data["google2fa_secret"]
+            );
+
+            //return view('inpanel.google2fa.index', ['issuer' =>  config('app.name'), 'label' => $user->email, 'user' => $user,'url' => $url, 'secret' => $registration_data["google2fa_secret"]]);
+        }*/
+    }
+
+    private function getQRCodeUrl($company, $holder, $secret)
+    {
+        return 'otpauth://totp/' .
+            rawurlencode($company) .
+            ':' .
+            rawurlencode($holder) .
+            '?secret=' .
+            $secret .
+            '&issuer=' .
+            rawurlencode($company) .
+            '';
+    }
+
+    public function disableTwoFactSetting()
+    {
+        $user = auth()->user();
+        $user->two_fact_auth = 0;
+        $user->two_fact_confirm = 0;
+        $user->google2fa_secret = null;
+        $user->save();
+        return Redirect::back()
+            ->withFlashSuccess(__('inpanel.user.profile.preferences.two_fact.disabled'));
+    }
+    /**
+     * Created by Vikash Yadav 
+     * Support Panellist Start 
+     */
+     
+    public function panellistSupport(Request $request){
+
+        if ($request->all()) {
+            //echo '<pre>';
+            //print_r($request->all());die;
+            $user = auth()->user();
+            $this->validate($request, [
+                'title' => 'required',
+                'support_type' => 'required',
+                'attachment' => 'image|mimes:jpeg,png,jpg|max:2048',
+                'message' => 'required',
+                
+            ]);
+
+    
+            if ($request->hasFile('attachment')) {
+                $image = $request->file('attachment');
+                $filename = time().'.'.$image->getClientOriginalExtension();
+                $destinationPath = public_path('/support_attachment');
+                $image->move($destinationPath, $filename);
+            }else{
+                $filename =NULL; 
+            }
+            $panellistSupportDetails = PanellistSupport::select('id')->orderBy('id','desc')->first();
+            //echo '<pre>';
+           // print_r($panellistSupportDetails);die;
+            $fiveRandomDigit = mt_rand(10000,99999);
+            if(!empty($panellistSupportDetails)){ 
+                $supportid = ($panellistSupportDetails->id+1);          
+                $ticketId = $fiveRandomDigit.''.$supportid;    
+            }else{
+                $supportid = 1;
+                $ticketId = $fiveRandomDigit.''.$supportid;    
+            }
+
+            //print_r($ticketId);die;
+            
+                $supportid = PanellistSupport::create([
+                    'user_id'      => $user->id,
+                    'ticket_id'    => $ticketId,
+                    'project_code' => $request->input('title'),
+                    'subject'      => $request->input('support_type'),
+                    'file_name'    => $filename,
+                    'message'      => $request->input('message'),
+                    'updated_at'   => NULL
+                ])->id;
+                
+                //PanellistSupport::where('id',$supportid)->update(['ticket_id'=>$ticketId]);
+
+                SupportChat::create([
+                    'ticket_id'        => $supportid,
+                    'user_id'          => $user->id,
+                    'content'          => $request->input('message'),
+                    'attach_file_name' => $filename
+                ]);
+                
+            return redirect()->route('inpanel.user.support_history')->withFlashSuccess("Your support successfully created");
+            
+
+        }
+
+        return view('inpanel.support.panellistSupport');
+    }
+
+    public function supportHistory(){
+         
+        $user = auth()->user();
+        $supportHistory = PanellistSupport::where('user_id',$user->id)->orderBy("orderByUpdate", "desc")->get();
+        // echo '<pre>';
+        // print_r($supportHistory);die;
+        return view('inpanel.support.support_history')
+               ->with('supportHistory' , $supportHistory)
+               ->with('userTimezone',$user->timezone);
+    }
+
+    public function supportChat(Request $request,$ticket_id){
+
+        $user = auth()->user();
+        if ($request->all()) {
+            //echo '<pre>';
+            //print_r($request->all());die;
+            $this->validate($request, [
+                'message' => 'required',
+                'attachment' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            ]);
+
+    
+            if ($request->hasFile('attachment')) {
+                $image = $request->file('attachment');
+                $filename = 'chat-'.time().'.'.$image->getClientOriginalExtension();
+                $destinationPath = public_path('/support_attachment');
+                $image->move($destinationPath, $filename);
+            }else{
+                $filename =NULL;
+            }
+                SupportChat::create([
+                    'ticket_id'        => $ticket_id,
+                    'user_id'          => $user->id,
+                    'content'          => $request->input('message'),
+                    'attach_file_name' => $filename
+                ]);
+
+                PanellistSupport::where('id',$ticket_id)->update(['updated_at'=>Carbon::now()]);
+            return \Redirect::back();
+        
+        }
+        //echo '<pre>';
+        $supportHistory = PanellistSupport::where('id',$ticket_id)->where('user_id',$user->id)->first();
+        
+        if(empty($supportHistory)){
+            return redirect()->route('inpanel.user.support_history');
+        }
+        $allChatsById = SupportChat::where('ticket_id',$ticket_id)->get();
+        //print_r($allChatsById);die;
+        return view('inpanel.support.support_chat')
+               ->with('supportHistory' , $supportHistory)
+               ->with('allChatsById' , $allChatsById)
+               ->with('userTimezone',$user->timezone);
+    }
+
+    public function changeSupportStatus(Request $request){
+        $supportId = $request->input('supportId');
+
+        // $updateSupport = PanellistSupport::where('id','=',$supportId)
+        // ->update(['status' => 1,'updated_at'=>Carbon::now()]);
+        $changeStatus = $request->input('statusData');
+        $updateUsers = PanellistSupport::where('id','=',$supportId)
+        ->update(['status' => $changeStatus,'updated_at'=>Carbon::now()]);
+
+        return response()->json(['status'=>200], 200);
+
+    }
+    /**
+     * Support Panellist End
+     */
+
+    /**
+     * This action is used for Adding activity log as the User Completes any profile.
+     *
+     * @param $user
+     * @param $profile
+     */
+    private function logProfileAchievementActivity($user,$profile)
+    {
+
+            activity("user_achievements")
+            ->causedBy($user->id)
+            ->withProperties(["points"=> $profile['points']])
+            ->log('inpanel.activity_log.profile.'.$profile['code'].'.achieved');
+    }
+}

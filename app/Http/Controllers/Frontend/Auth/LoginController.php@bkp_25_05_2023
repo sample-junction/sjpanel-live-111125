@@ -1,0 +1,274 @@
+<?php
+
+namespace App\Http\Controllers\Frontend\Auth;
+
+use App\Events\Inpanel\Auth\UserAchievementUpdate;
+use App\Events\Inpanel\Auth\UserConfirmed;
+use App\Helpers\Auth\Auth;
+use App\Mail\Frontend\EmailOtp\EmailOtpMail;
+use App\Models\Auth\User;
+use App\Models\Auth\UserEmailOtp;
+use Illuminate\Http\Request;
+use App\Exceptions\GeneralException;
+use App\Http\Controllers\Controller;
+use App\Helpers\Frontend\Auth\Socialite;
+use App\Events\Frontend\Auth\UserLoggedIn;
+use App\Events\Frontend\Auth\UserLoggedOut;
+use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use App\Repositories\Frontend\Auth\UserSessionRepository;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Cookie;
+
+/**
+ * Class LoginController.
+ */
+class LoginController extends Controller
+{
+    use AuthenticatesUsers;
+    public function __construct()
+    {
+       // $this->redirectTo = url()->previous();
+        //$this->middleware('guest', ['except' => 'logout']);
+    }
+
+    /**
+     * Where to redirect users after login.
+     *
+     * @return string
+     */
+    public function redirectPath()
+    {
+        return route(home_route());
+    }
+
+    /**
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    public function showLoginForm()
+    {
+         $uuid = Str::uuid()->toString();
+         $ip= request()->ip();
+         $DFIQ=config('settings.dfiq.status');
+         $geodata = geoip(request()->ip());
+
+         $ipcountryCode = $geodata->getAttribute('iso_code');
+       
+        return view('frontend.auth.login')->with('ip',str_replace('.','-',request()->ip()))
+            ->with('uuid',$uuid)
+            ->with('dfiq',$DFIQ)
+            ->with('country_code',$ipcountryCode)
+            ->withSocialiteLinks((new Socialite)->getSocialLinks());
+
+    }
+
+    /**
+     * Get the login username to be used by the controller.
+     *
+     * @return string
+     */
+    public function username()
+    {
+        return config('access.users.username');
+    }
+
+    /**
+     * The user has been authenticated.
+     *
+     * @param Request $request
+     * @param         $user
+     *
+     * @return \Illuminate\Http\RedirectResponse
+     * @throws GeneralException
+     */
+    protected function authenticated(Request $request, $user)
+    {
+          if($request->has('remember')){
+            Cookie::queue('email',$request->get('email'),1440);
+            Cookie::queue('password',$request->get('password'),1440);
+          }
+        /*
+         * Check to see if the users account is confirmed and active
+         */
+        if (!$user->isConfirmed()) {
+            auth()->logout();
+
+            // If the user is pending (account approval is on)
+            if ($user->isPending()) {
+
+                throw new GeneralException(__('exceptions.frontend.auth.confirmation.pending'));
+            }
+
+            // Otherwise see if they want to resent the confirmation e-mail
+            throw new GeneralException(__('exceptions.frontend.auth.confirmation.resend', ['url' => route('frontend.auth.account.confirm.resend', $user->{$user->getUuidName()})]));
+        } elseif (! $user->isActive()) {
+            auth()->logout();
+            throw new GeneralException(__('exceptions.frontend.auth.deactivated'));
+        }
+        
+        event(new UserLoggedIn($user));
+        session()->put('current_user', auth()->user());
+        //Last Active Time Added By Ramesh//
+        session()->put('last_active', time());
+        //End Here//
+        $user = auth()->user();
+        $user->two_fact_confirm = 0;
+        $user->save();
+        // If only allowed one session at a time
+        if (config('access.users.single_login')) {
+            resolve(UserSessionRepository::class)->clearSessionExceptCurrent($user);
+        }
+
+        return redirect()->intended($this->redirectPath());
+    }
+
+    /**
+     * Log the user out of the application.
+     *
+     * @param Request $request
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function logout(Request $request)
+    {
+
+        /*
+         * Remove the socialite session variable if exists
+         */
+        if (app('session')->has(config('access.socialite_session_name'))) {
+            app('session')->forget(config('access.socialite_session_name'));
+        }
+
+        /*
+         * Remove any session data from backend
+         */
+        app()->make(Auth::class)->flushTempSession();
+
+        /*
+         * Fire event, Log out user, Redirect
+         */
+        \Cookie::queue(\Cookie::forget('Tour',0,'test3.sjpanel.com'));
+        $user = auth()->user();
+        $user->two_fact_confirm = 0;
+        //$user->home_country='';
+        $user->save();
+        event(new UserLoggedOut($request->user()));
+
+        /*
+         * Laravel specific logic
+         */
+        $this->guard()->logout();
+        $request->session()->invalidate();
+        return redirect()->route('frontend.index');
+    }
+
+    /**
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function logoutAs()
+    {
+        // If for some reason route is getting hit without someone already logged in
+        if (! auth()->user()) {
+            return redirect()->route('frontend.auth.login');
+        }
+        // If admin id is set, relogin
+        if (session()->has('admin_user_id') && session()->has('temp_user_id')) {
+            // Save admin id
+            $admin_id = session()->get('admin_user_id');
+
+            app()->make(Auth::class)->flushTempSession();
+
+            // Re-login admin
+            auth()->loginUsingId((int) $admin_id);
+
+            // Redirect to backend user page
+            return redirect()->route('admin.auth.user.index');
+        } else {
+            app()->make(Auth::class)->flushTempSession();
+
+            // Otherwise logout and redirect to login
+            auth()->logout();
+
+            return redirect()->route('frontend.auth.login');
+        }
+    }
+
+    public function otpConfirmationForm()
+    {
+        return view('frontend.auth.google2fa.two_fact_login');
+    }
+
+    public function postOtpConfirmation()
+    {
+        return redirect()->route('inpanel.dashboard')
+            ->withFlashSuccess(__('frontend.messages.success'));
+    }
+
+    public function getMode(Request $request)
+    {
+        $mode = $request->mode;
+        if($mode==1){
+            return view('frontend.auth.google2fa.two_fact_auth');
+        }elseif($mode==2){
+            $user = auth()->user();
+            $email = $user->email;
+            $six_digit_random_number = mt_rand(100000, 999999);
+            $encrypt_otp = \Crypt::encrypt($six_digit_random_number);
+            if($encrypt_otp){
+                $insert_data = [
+                    'user_id' => $user->id,
+                    'otp' => $encrypt_otp,
+                ];
+                $save_user_email_otp = UserEmailOtp::create($insert_data);
+                $email = new EmailOtpMail($user,$six_digit_random_number);
+                Mail::send($email);
+                return view('frontend.auth.google2fa.email_otp_auth')
+                    ->with('email',$user->email);
+            }
+        }else{
+            return false;
+        }
+    }
+
+    public function postEmailOtpConfirmation(Request $request)
+    {
+        $otp = $request->input('one_time_password', false);
+        if(!$otp){
+            return \Redirect::back()
+                ->withDanger(__('frontend.messages.error_2'));
+        }
+        $user = auth()->user();
+        $user_email_otp = UserEmailOtp::where('user_id', '=', $user->id)
+            ->orderBy('updated_at', 'DESC')->first();
+        $userOtpValue = \Crypt::decrypt($user_email_otp->otp);
+        if($userOtpValue==$otp){
+            $user->two_fact_confirm = 1;
+            $user->save();
+            $deleteOtp = UserEmailOtp::where('user_id', '=', $user->id)
+                ->delete();
+            return redirect()->route('inpanel.dashboard')
+                ->withFlashSuccess(__('frontend.messages.success'));
+        }else{
+            return \Redirect::back()
+                ->withErrors(__('frontend.messages.error'));
+        }
+    }
+
+    public function resendOtp()
+    {
+        $user = auth()->user();
+        $email = $user->email;
+        $six_digit_random_number = mt_rand(100000, 999999);
+        $encrypt_otp = \Crypt::encrypt($six_digit_random_number);
+        if($encrypt_otp) {
+            $insert_data = [
+                'user_id' => $user->id,
+                'otp' => $encrypt_otp,
+            ];
+            $save_user_email_otp = UserEmailOtp::create($insert_data);
+            $email = new EmailOtpMail($user, $six_digit_random_number);
+            Mail::send($email);
+        }
+        return response()->json(['status'=>200]);
+    }
+}
