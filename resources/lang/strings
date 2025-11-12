@@ -1,0 +1,13 @@
+<<<<<<< HEAD
+<?php
+
+return [
+    "" => "Welcome to :place"
+];
+=======
+<?php
+
+return [
+    "" => "Welcome to :place"
+];
+>>>>>>> dev

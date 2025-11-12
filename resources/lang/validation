@@ -1,0 +1,13 @@
+<<<<<<< HEAD
+<?php
+
+return [
+    "" => "The :attribute must be a valid UUID."
+];
+=======
+<?php
+
+return [
+    "" => "The :attribute must be a valid UUID."
+];
+>>>>>>> dev

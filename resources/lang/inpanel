@@ -1,0 +1,13 @@
+<<<<<<< HEAD
+<?php
+
+return [
+    "" => "Use Two Factor Authentication"
+];
+=======
+<?php
+
+return [
+    "" => "Use Two Factor Authentication"
+];
+>>>>>>> dev

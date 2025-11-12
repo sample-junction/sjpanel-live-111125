@@ -1,0 +1,13 @@
+<<<<<<< HEAD
+<?php
+
+return [
+    "" => "Registration is currently closed."
+];
+=======
+<?php
+
+return [
+    "" => "Registration is currently closed."
+];
+>>>>>>> dev

@@ -1,0 +1,13 @@
+<<<<<<< HEAD
+<?php
+
+return [
+    "" => "SJ Panel Team"
+];
+=======
+<?php
+
+return [
+    "" => "SJ Panel Team"
+];
+>>>>>>> dev

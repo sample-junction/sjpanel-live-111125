@@ -1,0 +1,979 @@
+<?php
+
+namespace App\Http\Controllers\Backend\Auth\User;
+
+use App\Models\Auth\User;
+use App\Models\Auth\FroudUsers;
+use App\Models\Report\SurveyReport;
+use App\Models\Report\SurveyStartCount;
+use App\Models\Profiler\UserAdditionalData;
+use App\Models\Profiler\ProfilerQuestions;
+use App\Mail\Backend\FraudInformation\FraudInformationEmail;
+use App\Mail\Backend\FraudInformation\BlacklistInformationEmail;
+use App\Repositories\Inpanel\Profiler\DetailedProfileRepository;
+use App\Models\Redeem\RequestRedeem;
+use App\Http\Controllers\Controller;
+use App\Events\Backend\Auth\User\UserDeleted;
+use App\Repositories\Backend\Auth\RoleRepository;
+use App\Repositories\Backend\Auth\UserRepository;
+use App\Repositories\Backend\Auth\PermissionRepository;
+use App\Http\Requests\Backend\Auth\User\StoreUserRequest;
+use App\Http\Requests\Backend\Auth\User\ManageUserRequest;
+use App\Http\Requests\Backend\Auth\User\UpdateUserRequest;
+use Freshbitsweb\Laratables\Laratables;
+use Illuminate\Http\Request;
+use anlutro\LaravelSettings\SettingStore as Setting;
+use Carbon\Carbon;
+use App\Repositories\Inpanel\Traffic\TrafficRepository;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Response;
+use App\Models\Setting\Setting as settings;
+use Illuminate\Support\Facades\Config;
+
+/**
+ * Class UserController.
+ */
+class UserController extends Controller
+{
+    /**
+     * @var UserRepository
+     */
+    protected $userRepository;
+
+    /**
+     * UserController constructor.
+     *
+     * @param UserRepository $userRepository
+     */
+    public function __construct(UserRepository $userRepository,TrafficRepository $trafficRepo, DetailedProfileRepository $detailedProfileRepo)
+    {
+        $this->userRepository = $userRepository;
+        $this->trafficRepo = $trafficRepo;
+        $this->detailedProfileRepo = $detailedProfileRepo;
+    }
+
+    /**
+     * @param ManageUserRequest $request
+     *
+     * @return \Illuminate\Contracts\View\Factory|\Illuminate\View\View
+     */
+    public function index(ManageUserRequest $request)
+    {
+        /*dd($this->userRepository->getActivePaginated(25, 'id', 'asc'));*/
+        /*$users = $this->userRepository->getUsers();*/
+        return view('backend.auth.user.index')
+            ->withUsers($this->userRepository->getUsers());
+    }
+
+    public function reportincentive(ManageUserRequest $request){
+
+    
+        $fromDate   = $request->get('fromDate');
+        $toDate     = $request->get('toDate');
+        $searchType = $request->input('searchType');
+        
+
+        if(!empty($fromDate) && !empty($toDate)){
+
+           /* $get_redeem_data = \DB::table('users')        
+                        ->select('users.panellist_id', 'table1.user_uuid','table1.earned_points')
+                        ->rightJoin(\DB::raw('(SELECT '.\DB::raw('SUM(redeem_points) as earned_points').' ,user_uuid FROM request_redeems WHERE status = "completed" GROUP BY user_uuid
+                                    ) as table1'), function ($join) {
+                                        $join->on ('users.uuid', '=', 'table1.user_uuid' );
+                                    })
+                        ->whereBetween('users.updated_at', [$fromDate, $toDate])
+                        ->get();*/
+            
+            $get_redeem_data = UserAdditionalData::whereBetween('created_at', [Carbon::parse($fromDate), Carbon::parse($toDate)])->get();           
+
+        }else if(!empty($searchType)){
+
+           /* $query = \DB::table('users')        
+                        ->select('users.panellist_id', 'table1.user_uuid','table1.earned_points')
+                        ->rightJoin(\DB::raw('(SELECT '.\DB::raw('SUM(redeem_points) as earned_points').' ,user_uuid FROM request_redeems WHERE status = "completed" GROUP BY user_uuid
+                        ) as table1'), function ($join) {
+                            $join->on ('users.uuid', '=', 'table1.user_uuid' );
+                        });
+                if($searchType == "emailid"){
+                    $emailids = explode(',',$request->input('userids'));
+                    $query->whereIn('users.email', $emailids);
+                    
+                }
+                        
+                if($searchType == "panelists_id"){
+                    $panelists_ids = explode(',',$request->input('userids'));
+                    $query->whereIn('users.panellist_id', $panelists_ids);
+                }
+                
+            $get_redeem_data = $query->get();*/
+
+            if($searchType == "uuid"){
+                $uuids = explode(',',$request->input('userids'));
+                $get_redeem_data = UserAdditionalData::whereIn('uuid', $uuids)->get();
+            }
+
+        }else{
+
+            /*$get_redeem_data = \DB::table('users')        
+                        ->select('users.panellist_id', 'table1.user_uuid','table1.earned_points')
+                        ->rightJoin(\DB::raw('(SELECT user_uuid, '.\DB::raw('SUM(redeem_points) as earned_points').' FROM request_redeems WHERE status = "completed" GROUP BY user_uuid
+                                    ) as table1'), function ($join) {
+                                        $join->on ('users.uuid', '=', 'table1.user_uuid' );
+                                    })
+                        ->get();*/
+
+            $get_redeem_data = UserAdditionalData::get();
+
+        }
+
+        /*echo '<pre>';
+        foreach($get_redeem_data as $result){
+            echo $result->user_points['completed'].'<br>';
+            echo $result->user_points['redeemed_points'];
+        }
+        die;*/
+
+        
+      // print_r($get_redeem_data);die;
+        return view('backend.auth.user.reports-incentive')
+              ->with('get_redeem_data',$get_redeem_data);
+    }
+
+    public function reportactive(ManageUserRequest $request){
+        //print_r(Carbon::now()->subMonths(6));die;
+        //Carbon::parse($user->dob)->age;
+        $modifiedActiveUsers = array();
+
+        if($request->input()){
+            $searchType = $request->input('searchType');
+            if($searchType == "uuid"){
+                $uuids = explode(',',$request->input('userids'));
+                $activeUsers = $this->userRepository->getActiveUsers($uuids);
+            }elseif($searchType == "panelists_id"){
+                $panelists_ids = explode(',',$request->input('userids'));
+                $activeUsers = $this->userRepository->getActiveUsers(null,$panelists_ids);
+            }
+        }else{
+            $activeUsers = $this->userRepository->getActiveUsers();
+        }
+        
+       
+        return view('backend.auth.user.reports-active')
+           ->with('activeUsers', $activeUsers);
+    }
+
+    public function reportrejection(ManageUserRequest $request){
+
+       /*$froudUsers =  FroudUsers::get();
+       echo '<pre>';
+       print_r($froudUsers); die;*/
+
+        $fromDate   = $request->get('fromDate');
+        $toDate     = $request->get('toDate');
+        if(!empty($fromDate) && !empty($toDate)){
+            $trafficRejectionData = $this->trafficRepo->getTrafficsStatsRejected($fromDate,$toDate);
+        }else{
+            $trafficRejectionData = $this->trafficRepo->getTrafficsStatsRejected();
+        }
+        
+        //print_r($trafficRejectionData);die;
+
+        return view('backend.auth.user.reports-rejection')
+            ->with('trafficRejectionData', $trafficRejectionData);
+    }
+
+    public function panelResponse(ManageUserRequest $request){
+        //$api_url = "https://test3.sjpanel.com";
+
+        
+        $timePeriod = $request->get('timeperiod');
+        $fromDate   = $request->get('fromDate');
+        $toDate     = $request->get('toDate');
+        $selectPeriod = true;
+
+        //$fromLastDay = config('app.update_response_rate.days');
+
+        if(!empty($fromDate) && !empty($toDate)){
+
+            $selectPeriod = false;
+
+        }elseif(!empty($timePeriod)){
+            $timePeriod = $timePeriod;
+            
+        }else{
+            $timePeriod = 30;
+        }
+
+
+        if($selectPeriod){
+           $fromLastDays = now()->subDays($timePeriod)->endOfDay();
+           
+            $trafficStats = $this->trafficRepo->getTrafficsStats($fromLastDays);           
+
+            $invite_sent_details = \DB::table('invite_sent_details')->select(\DB::raw('SUM(reminder) as rcnt'),\DB::raw('SUM(invitecnt) as icnt'),\DB::raw('SUM(surveycnt) as scnt'))->where('created_at',">=",$fromLastDays)->orWhere('updated_at',">=",$fromLastDays)->first();
+       
+        }else{
+
+             $trafficStats = $this->trafficRepo->getTrafficsStatsByDateRange($fromDate, $toDate);           
+
+             $invite_sent_details = \DB::table('invite_sent_details')
+             ->select(\DB::raw('SUM(reminder) as rcnt'),\DB::raw('SUM(invitecnt) as icnt'),\DB::raw('SUM(surveycnt) as scnt'))
+             ->whereBetween('created_at', [$fromDate, $toDate])
+             ->orWhereBetween('updated_at', [$fromDate, $toDate])->first();
+
+        }    
+        
+       // $totalStart  = count($trafficStats);
+        $totalStart  = $trafficStats->startCount;
+        //print_r($totalStart);die;
+        $totalInvite =  $invite_sent_details->icnt;
+        //$totalStart =  2;
+        if($totalInvite > 0){
+            $resposeRate = round(($totalStart/$totalInvite)*100);
+        }else{
+            $resposeRate = 0;
+            $totalInvite = 0;  
+        }
+        
+
+
+        
+
+            return view('backend.auth.user.reports-response')
+                ->with('totalInvite', $totalInvite)
+                ->with('totalStart', $totalStart)
+                ->with('resposeRate', $resposeRate);
+                
+    }
+   //Function Added By Ramesh Kamboj//
+     public function reportallsurvey(ManageUserRequest $request){
+
+        /*$data = SurveyReport::get();
+        print_r($data); die;*/
+
+        $timePeriod = $request->get('timeperiod');
+        $fromDate   = $request->get('fromDate');
+        $toDate     = $request->get('toDate');
+        $selectPeriod = true;
+
+        if(!empty($fromDate) && !empty($toDate)){
+
+            $selectPeriod = false;
+
+        }elseif(!empty($timePeriod)){
+            $timePeriod = $timePeriod;
+            
+        }else{
+            $timePeriod = 30;
+        }
+
+        if($selectPeriod){
+           $fromLastDays = now()->subDays($timePeriod)->endOfDay();
+           $trafficStats = $this->trafficRepo->getTrafficsStatsAllUsers(null,null,$fromLastDays);
+       
+        }else{
+
+            $trafficStats = $this->trafficRepo->getTrafficsStatsAllUsers($fromDate,$toDate);
+
+        } 
+        
+        //echo '<pre>';
+        // foreach($trafficStats as $trafficStat){
+        //     $uuids = explode('_',$trafficStat->vvars['sjpid']);
+
+        //     $trafficStat->uuid = $uuids[0];
+        // }
+
+        //dd($trafficStats);die;
+
+        // print_r(count($trafficStats));
+        //  echo '<pre>';
+        //  print_r($trafficStats);die;
+        return view('backend.auth.user.reports-all-survey')
+            //->withUsers($this->userRepository->getActiveUsers());
+            ->with('trafficStats', $trafficStats);
+        
+    }
+  //End Here
+    public function reportsurvey(ManageUserRequest $request){
+
+        /*$data = SurveyReport::get();
+        print_r($data); die;*/
+
+        $timePeriod = $request->get('timeperiod');
+        $fromDate   = $request->get('fromDate');
+        $toDate     = $request->get('toDate');
+        $selectPeriod = true;
+
+        if(!empty($fromDate) && !empty($toDate)){
+
+            $selectPeriod = false;
+
+        }elseif(!empty($timePeriod)){
+            $timePeriod = $timePeriod;
+            
+        }else{
+            $timePeriod = 30;
+        }
+
+        if($selectPeriod){
+           $fromLastDays = now()->subDays($timePeriod)->endOfDay();
+           $trafficStats = $this->trafficRepo->getTrafficsStatsAllUsers(null,null,$fromLastDays);
+       
+        }else{
+
+            $trafficStats = $this->trafficRepo->getTrafficsStatsAllUsers($fromDate,$toDate);
+
+        } 
+        
+        //echo '<pre>';
+        // foreach($trafficStats as $trafficStat){
+        //     $uuids = explode('_',$trafficStat->vvars['sjpid']);
+
+        //     $trafficStat->uuid = $uuids[0];
+        // }
+
+        //dd($trafficStats);die;
+
+        // print_r(count($trafficStats));
+        //  echo '<pre>';
+        //  print_r($trafficStats);die;
+        return view('backend.auth.user.reports-survey')
+            //->withUsers($this->userRepository->getActiveUsers());
+            ->with('trafficStats', $trafficStats);
+        
+    }
+
+    public function reportDetails(ManageUserRequest $request,$uuid){
+       
+        $panelist_id =  User::getPanelistsId($uuid);
+        $surveyData = SurveyReport::where('uuid',$uuid)->get()->toArray();
+        //echo '<pre>';
+        //print_r($surveyData);exit;
+        return view('backend.auth.user.reports-survey-details')
+                ->with('uuid', $uuid)
+                ->with('panelist_id', $panelist_id)
+                ->with('surveyData', $surveyData);
+
+    }
+
+
+
+    public function userFraud(ManageUserRequest $request){
+        
+        if($request->input()){
+            if($request->get('date')!=1){
+            $searchType = $request->input('searchType');
+            if($searchType == "uuid"){
+                $uuids = explode(',',$request->input('userids'));
+                $activeUsers = $this->userRepository->getActiveUsersForFraud($uuids);
+            }elseif($searchType == "panelists_id"){
+                $panelists_ids = explode(',',$request->input('userids'));
+                $activeUsers = $this->userRepository->getActiveUsersForFraud(null,$panelists_ids);
+            }
+        }else{
+            $status=1;
+            $activeUsers = $this->userRepository->getActiveUsersForFraud(null,null,$status);
+        }
+        }else{
+            $activeUsers = $this->userRepository->getActiveUsersForFraud();
+        }
+        if($request->get('date')!=1){
+            $date='';
+        }else{
+            $date=1;
+        }
+        //$userAddData = UserAdditionalData::where('uuid','=','e564d753-197d-417f-b2d1-5171a976f57f')->first();
+        //$newActiveUsers = ['e564d753-197d-417f-b2d1-5171a976f57f'];
+        /*echo '<pre>';
+        print_r($newActiveUsers);die;*/
+       // $usersAdditionalData = $this->userRepository->getUserAnswersByUserIds($newActiveUsers);
+       // print_r(count($usersAdditionalData));die;
+       // $usersAdditionalData->$policyPackageDetails ->map(function ($item){
+           /* $data = array();
+            if(!empty($item->user_answers)){
+                foreach($item->user_answers as $result){
+                    if($result['profile_question_code'] == 'STANDARD_HHI_US'){
+                        $amount_code = $result['selected_answer'][0];
+
+                    }
+                }
+            }*/
+           // $item['user_profile'] = $modifiedActiveUsers[$item->uuid];
+           // $item['user_profile1'] = $modifiedActiveUsers[$item->uuid];
+       // });
+
+       
+       
+        //echo '<pre>';
+       // print_r($usersAdditionalData);die;
+       // $data = ProfilerQuestions::first();
+
+    //     $profile = $this->detailedProfileRepo->getProfileWithAllData($country_code=null, $language_code=null);
+    //     $user_answers = [];
+    //     foreach ($userAddData->user_answers as $key => $value) {
+		
+    //         if($value['profile_section_code']==$profile->general_name){
+                
+	// 			foreach ($profile->questions as $data) {
+				
+    //                  $dataOther = $data->id . '_OTHER';
+	// 				 $dataSelectOther = $data->id . '_SELECT_OTHER';	
+					 				 
+	// 				if($data->id==$value['profile_question_code']){
+					 
+    //                     if(is_array($value['selected_answer'])){
+    //                         $answer = implode(',',$value['selected_answer']);
+    //                     }else{
+    //                         $answer = $value['selected_answer'];
+    //                     }
+						
+	// 					if(($data->userAnswers) && (!$data->userAnswers->isEmpty())){
+							
+	// 						$data->userAnswers->put('user_answer', $answer);
+							
+	// 					}else{
+	// 					     $data->userAnswers = collect([
+	// 							'user_answer' => $answer,
+	// 						]);						    
+						
+	// 					}	
+						
+    //                     break;
+						
+    //                 }elseif($dataOther==$value['profile_question_code']){
+					
+	// 				   if(is_array($value['selected_answer'])){
+    //                         $answer = implode(',',$value['selected_answer']);
+    //                     }else{
+    //                         $answer = $value['selected_answer'];
+    //                     }
+						
+	// 					if(($data->userAnswers) && (!$data->userAnswers->isEmpty())){
+							 
+	// 						 $data->userAnswers->put('other', $answer);
+							 
+	// 					}else{
+	// 					     $data->userAnswers = collect([
+	// 							'other' => $answer,
+	// 						]);						    
+						
+	// 					}
+                         
+    //                     break;
+	// 				}elseif($dataSelectOther==$value['profile_question_code']){
+					    
+	// 				   if(is_array($value['selected_answer'])){
+    //                         $answer = implode(',',$value['selected_answer']);
+    //                     }else{
+    //                         $answer = $value['selected_answer'];
+    //                     }
+						
+	// 					if(($data->userAnswers) && (!$data->userAnswers->isEmpty())){
+	// 							$data->userAnswers->put('selectother', $answer);
+								
+	// 					}else{
+	// 					     $data->userAnswers = collect([
+	// 							'selectother' => $answer,
+	// 						]);						    
+						
+	// 					}
+                         
+    //                     break;
+	// 				}
+					 
+					 
+					
+    //             }
+				
+				
+    //         }
+    //     }       
+
+    //    print_r($profile);die;
+
+    //    echo '<table class="table">';
+    //     foreach($usersAdditionalData as $result){ 
+        
+
+    //         echo '<tr><td style="border:2px solid;">'.$result->uuid.'</td>';
+    //         echo '<td style="border:2px solid;">'.$result->u_id.'</td>';
+
+    //         foreach($result->user_answers as $row){
+    //             //$data = UserAdditionalData::getAnswersProjectionArray($row['profile_section_code'],$row['profile_question_code']);
+    
+    //             echo '<td style="border:2px solid;">'.$row['profile_section_code'].'</td>';
+    //             echo '<td style="border:2px solid;">'.$row['profile_question_code'].'</td>';
+    //             if(is_array($row['selected_answer'])){
+    //                 echo '<td style="border:2px solid;">'.implode(',',$row['selected_answer']).'</td>';
+    //             }else{
+    //                 echo '<td style="border:2px solid;">'.$row['selected_answer'].'</td>';
+    //             }
+    //         }
+    //         echo '</tr>';
+            
+    //     }
+    //     echo '</table>';
+    //     die;
+
+        
+        //echo '<pre>';
+        //print_r($activeUsers);die;
+
+        //print_r(session()->get('current_user')->id);
+        if(isset(session()->get('current_user')->id)){
+            $userid = session()->get('current_user')->id;
+        }else{
+            $userid = auth()->id(); 
+        }
+
+        $getFraudLimit = settings::where('key','=','PANEL_FRAUD_LIMIT')->first();
+        return view('backend.auth.user.fraud-users')
+            //->withUsers($this->userRepository->getActiveUsers());
+            ->with('userid', $userid)
+            ->with('date',$date)
+            ->with('activeUsers', $activeUsers)
+            ->with('getFraudLimit', $getFraudLimit);
+    }
+    public function UpdateNotification(Request $request){
+        
+       $userids=$request->get('userIds');
+       $updateUsers = User::whereIn('id',$userids)
+                            ->update(['confirmed' => 2]);
+    return response()->json(['status'=>200], 200);
+    }
+
+    public function InsertuserFraud(ManageUserRequest $request){
+        $panelistsId = $request->input('panelistsId');
+        $managerId   = $request->input('managerId');
+        $projectid   = $request->input('projectid');
+        $reason      = $request->input('reason');
+        
+        $add_fraudUsers = array(
+            'panellist_id' => $panelistsId,
+            'manager_id'   => $managerId,
+            'project_id'   => $projectid,
+            'reason'       => $reason
+        );
+        
+        //print_r($add_fraudUsers);die;
+        $froudUsers1 =  FroudUsers::create($add_fraudUsers);
+        if($froudUsers1){
+            $user = User::where('panellist_id',$panelistsId)->first();
+            $email = new FraudInformationEmail($user,$projectid);
+            Mail::send($email);
+        }
+        
+        
+        $fraudUsersData = FroudUsers::where('panellist_id',$panelistsId)->get();
+        $getFraudLimit = settings::where('key','=','PANEL_FRAUD_LIMIT')->first();
+        if(count($fraudUsersData) >= $getFraudLimit->value){
+            $updateUsers = User::where('panellist_id','=',$panelistsId)
+                            ->update(['is_blacklist' => 1]);
+            //print_r($updateUsers);die;
+            if($updateUsers){
+                $user = User::where('panellist_id',$panelistsId)->first();
+                $email = new BlacklistInformationEmail($user);
+                Mail::send($email);
+            }
+                            
+        }
+        
+        return response()->json(['status'=>200], 200);
+       
+    }
+
+
+
+
+    /**
+     * Export csv user Profile data
+     * New changes in date 29-12-2022
+     * */
+    public function exportUserProfile(Request $request)
+    {
+
+
+        $panellist_id = $request->input('panellist_ids');
+       // print_r($panellist_id);
+       // $panellist_ids = explode(' ',$panellist_id);
+        $panellist_ids = array_map('trim', explode(',', $panellist_id));
+       // var_dump($panellist_ids);die;
+        $profile_sections = $request->input('profile_section');
+        $contryCode = $request->input('country_code');
+       
+        $date = date("d-m-Y");
+
+        $file_name = 'SJ Panel User Profile '.$date;
+
+        $headers = array(
+            "Content-type" => "text/csv",
+            "Content-Disposition" => "attachment; filename={$file_name}.csv",
+            "Pragma" => "no-cache",
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
+            "Expires" => "0"
+        );
+
+        $activeUsers = User::whereIn('panellist_id',$panellist_ids)->get();
+
+
+         //print_r($activeUsers);die;
+        // echo '<pre>';
+       // $columns = array('User Id', 'Panellist Id', 'First Name', 'Last Name','Email' ,'Value($)','Requested Date','Download Date');
+        //$locale = Config::get('app.locale');
+        //$locale = explode('_',$locale);
+        // $country = $locale[1];
+        // $language = $locale[0];
+        //$country = 'US';
+        //$language = 'en';
+
+        // $questionsProjection = ProfilerQuestions::getProjectionArray($country,strtoupper($language));
+        // print_r($questionsProjection);
+
+        $all_question = ProfilerQuestions::whereIn('profile_section_code',$profile_sections)->where('country_code',$contryCode)->pluck('general_name')->toArray();
+        //$all_question = ProfilerQuestions::where('profile_section_code','MY_PROFILE')->where('general_name','=','STANDARD_GROCERY_SHOPPER')->where('country_code','IN')->where('language_code','EN')->get()->toArray();
+
+       // $basicFields = array('panellist_id'=>'Panellist Id');
+       
+        if (in_array("HIDDEN", $profile_sections)){
+            array_unshift($all_question,'Panellist_Id','DOB','Age','Zipcode','STATE','DMA','DMA_NAME','REGION','Device_Preference');
+        }else{
+            array_unshift($all_question,'Panellist_Id','DOB','Age','Zipcode','Device_Preference');
+        }
+
+        //print_r($all_question);die;
+
+        //$profileQuestion = ProfilerQuestions::whereIn('profile_section_code',$profile_sections)->project($questionsProjection)->pluck('translated')->toArray();
+        $profileQuestion = ProfilerQuestions::whereIn('profile_section_code',$profile_sections)->pluck('translated')->toArray();
+       // print_r($profileQuestion);die;
+        
+        $question_text=[];
+        foreach($profileQuestion as $question){
+            $question_text[] = $question[0]['text'];
+        }
+        //array_unshift($question_text,'Panellist Id');
+        //print_r($question_text);die;
+
+        $callback = function() use ($activeUsers, $profile_sections,$all_question,$question_text,$contryCode)
+        {
+            $file = fopen('php://output', 'w');
+            //fputcsv($file, $columns);
+           fputcsv($file, $all_question);
+
+          // fputcsv($file, $question_text);
+
+           foreach($activeUsers as $row)
+           {
+
+                $userAllData = $this->userRepository->getUseCompleteData($row->id,$profile_sections,$contryCode);
+ 
+                
+                $basicData = $userAllData['Basic Profile'];
+               // print_r($basicData);die;
+                    if(count($basicData) > 0)
+                    {
+                        $arr = array();
+                        foreach($all_question as $questionKey){
+
+                            if(array_key_exists($questionKey,$basicData)){
+                                array_push($arr,$basicData[$questionKey]);
+                            }else{
+                                array_push($arr,"");
+                            } 
+                            
+                        } 
+                        fputcsv($file, $arr);
+            
+                    }
+                
+            }//die;
+           fclose($file);
+        };
+
+        return Response::stream($callback, 200, $headers);
+        
+    }
+
+    //import csv user for fraud
+    public function importFraudUser(Request $request)
+    {
+        if(isset(session()->get('current_user')->id)){
+            $userid = session()->get('current_user')->id;
+        }else{
+            $userid = auth()->id(); 
+        }
+        $file = $request->file('importfile');
+        $customerArr = $this->csvToArray($file);
+       // echo '<pre>';
+       if($customerArr=="not_matched"){
+        return \Redirect::back()
+                    ->withErrors("Please only 3 column record insert.Please download demo sample excel.");
+       }
+       //print_r($customerArr);die;
+        if($customerArr){
+            $i=1;
+            foreach($customerArr as $row){
+                $i++;
+                $userExit = User::where('panellist_id',trim($row['panellist_id']))->count();
+                if($userExit==0){
+                    return \Redirect::back()
+                    ->withErrors("Inserted row number ".$i." Panellist id is not exit my database.Please checked.");
+                }
+            }
+           
+            foreach($customerArr as $row){
+                
+                $panelistsId = trim($row['panellist_id']);
+                
+                $add_fraudUsers = array(
+                    'panellist_id' => $panelistsId,
+                    'manager_id'   => $userid,
+                    'project_id'   => $row['project_id'],
+                    'reason'       => $row['reason']
+                );
+                
+                //print_r($add_fraudUsers);die;
+                $froudUsers1 =  FroudUsers::create($add_fraudUsers);
+                if($froudUsers1){
+                    $user = User::where('panellist_id',$panelistsId)->first();
+                    $email = new FraudInformationEmail($user,$row['project_id']);
+                    Mail::send($email);
+                }
+                
+                
+                $fraudUsersData = FroudUsers::where('panellist_id',$panelistsId)->get();
+                $getFraudLimit = settings::where('key','=','PANEL_FRAUD_LIMIT')->first();
+
+                if(count($fraudUsersData) >= $getFraudLimit->value){
+                    $updateUsers = User::where('panellist_id','=',$panelistsId)
+                                    ->update(['is_blacklist' => 1]);
+                    
+                    if($updateUsers){
+                        $user = User::where('panellist_id',$panelistsId)->first();
+                        $email = new BlacklistInformationEmail($updateUsers);
+                        Mail::send($email);
+                    }
+                }
+
+            }
+            return \Redirect::back()
+            ->withFlashSuccess("Successfully Imported");
+        }else{
+            return \Redirect::back()
+            ->withErrors("Some error occure. Please again checked");
+        }
+       
+    }
+
+    public function csvToArray($filename = '', $delimiter = ',')
+    {
+        if (!file_exists($filename) || !is_readable($filename))
+            return false;
+
+        $header = null;
+        $data = array();
+        if (($handle = fopen($filename, 'r')) !== false)
+        {
+            while (($row = fgetcsv($handle, 1000, $delimiter)) !== false)
+            {
+               // print_r($row);die;
+                if (!$header)
+                    //$header = $row;
+                    $header = array('panellist_id','project_id','reason');
+                else
+                    if (count($header) != count($row)) {
+                        return 'not_matched';
+
+                    }else{
+                        $data[] = array_combine($header, $row);
+                    }
+                    
+            }
+            fclose($handle);
+        }
+
+        return $data;
+    }
+
+
+    /**
+     * @param ManageUserRequest    $request
+     * @param RoleRepository       $roleRepository
+     * @param PermissionRepository $permissionRepository
+     *
+     * @return mixed
+     */
+    public function create(ManageUserRequest $request, RoleRepository $roleRepository, PermissionRepository $permissionRepository)
+    {
+        return view('backend.auth.user.create')
+            ->withRoles($roleRepository->with('permissions')->get(['id', 'name']))
+            ->withPermissions($permissionRepository->get(['id', 'name']));
+    }
+
+    /**
+     * @param StoreUserRequest $request
+     *
+     * @return mixed
+     * @throws \Throwable
+     */
+    public function store(StoreUserRequest $request)
+    {
+        $this->userRepository->create($request->only(
+            'first_name',
+            'last_name',
+            'email',
+            'password',
+            'active',
+            'confirmed',
+            'confirmation_email',
+            'roles',
+            'permissions'
+        ));
+
+        return redirect()->route('admin.auth.user.index')->withFlashSuccess(__('alerts.backend.users.created'));
+    }
+
+    /**
+     * @param ManageUserRequest $request
+     * @param User              $user
+     *
+     * @return mixed
+     */
+    public function show(ManageUserRequest $request, User $user)
+    {
+        return view('backend.auth.user.show')
+            ->withUser($user);
+    }
+
+    /**
+     * @param ManageUserRequest    $request
+     * @param RoleRepository       $roleRepository
+     * @param PermissionRepository $permissionRepository
+     * @param User                 $user
+     *
+     * @return mixed
+     */
+    public function edit(ManageUserRequest $request, RoleRepository $roleRepository, PermissionRepository $permissionRepository, User $user)
+    {
+        return view('backend.auth.user.edit')
+            ->withUser($user)
+            ->withRoles($roleRepository->get())
+            ->withUserRoles($user->roles->pluck('name')->all())
+            ->withPermissions($permissionRepository->get(['id', 'name']))
+            ->withUserPermissions($user->permissions->pluck('name')->all());
+    }
+
+    /**
+     * @param UpdateUserRequest $request
+     * @param User              $user
+     *
+     * @return mixed
+     * @throws \App\Exceptions\GeneralException
+     * @throws \Throwable
+     */
+    public function update(UpdateUserRequest $request, User $user)
+    {
+        $this->userRepository->update($user, $request->only(
+            'first_name',
+            'last_name',
+            'email',
+            'roles',
+            'permissions'
+        ));
+
+        return redirect()->route('admin.auth.user.index')->withFlashSuccess(__('alerts.backend.users.updated'));
+    }
+
+    /**
+     * @param ManageUserRequest $request
+     * @param User              $user
+     *
+     * @return mixed
+     * @throws \Exception
+     */
+    public function destroy(ManageUserRequest $request, User $user)
+    {
+        $this->userRepository->deleteById($user->id);
+
+        event(new UserDeleted($user));
+
+        return redirect()->route('admin.auth.user.deleted')->withFlashSuccess(__('alerts.backend.users.deleted'));
+    }
+
+    public function uniqueIPCheck()
+    {
+        $unique_ip_check = setting()->get('unique_ip_check');
+        return view('backend.unique_ip_check.index')
+            ->with('unique_ip_check',$unique_ip_check);
+    }
+    public function postUniqueIPCheck(Request $request)
+    {
+        $ip_check = $request->input('unique_ip_check',false);
+        if($ip_check){
+            setting()->set('unique_ip_check',$ip_check);
+            setting()->save();
+        }else{
+            setting()->set('unique_ip_check','0');
+            setting()->save();
+        }
+        return \Redirect::back()
+            ->withFlashSuccess("IP check enabled");
+    }
+
+    public function blackListedIps()
+    {
+        $row = [];
+        if(file_exists(resource_path().DIRECTORY_SEPARATOR."blacklisted_ips".DIRECTORY_SEPARATOR."blacklisted_ips.csv")){
+            $link_file = fopen(resource_path().DIRECTORY_SEPARATOR."blacklisted_ips".DIRECTORY_SEPARATOR."blacklisted_ips.csv",'r');
+            while (($line = fgetcsv($link_file)) !== FALSE) {
+                $row[] = $line;
+            }
+            unset($row[0]);
+        }
+        $ip_array = array_values($row);
+        $blacklisted_ips = [];
+        foreach($ip_array as $val){
+            $blacklisted_ips[] = $val[0];
+        }
+        return view('backend.blacklisted_ip.index')
+            ->with('blacklisted_ips', $blacklisted_ips);
+    }
+
+    public function addIps()
+    {
+        return view('backend.blacklisted_ip.add');
+    }
+
+    public function postIps(Request $request)
+    {
+        $ips = $request->input('ips', false);
+        $ip_data = preg_split('/\r\n|[\r\n]/', $ips);
+        $row = [];
+        if(file_exists(resource_path().DIRECTORY_SEPARATOR."blacklisted_ips".DIRECTORY_SEPARATOR."blacklisted_ips.csv")){
+            $link_file = fopen(resource_path().DIRECTORY_SEPARATOR."blacklisted_ips".DIRECTORY_SEPARATOR."blacklisted_ips.csv",'r');
+            while (($line = fgetcsv($link_file)) !== FALSE) {
+                $row[] = $line;
+            }
+            unset($row[0]);
+        }
+        $ip_array = array_values($row);
+        $blacklisted_ips = [];
+        foreach($ip_array as $val){
+            $blacklisted_ips[] = $val[0];
+        }
+        $new_blacklisted_ips = array_merge($blacklisted_ips,$ip_data);
+        $handle = fopen(resource_path().DIRECTORY_SEPARATOR."blacklisted_ips".DIRECTORY_SEPARATOR."blacklisted_ips.csv",'w+');
+        fputcsv($handle, array('Blacklisted Ips'));
+        if($new_blacklisted_ips){
+            foreach ($new_blacklisted_ips as $data){
+                fputcsv($handle, array($data));
+            }
+            fclose($handle);
+            $headers = array(
+                'Content-Type' => 'text/csv',
+            );
+        }
+        return \Redirect::back()
+            ->withFlashSuccess("New Ips Added");
+    }
+}

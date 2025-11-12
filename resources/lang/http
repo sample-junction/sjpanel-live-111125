@@ -1,0 +1,13 @@
+<<<<<<< HEAD
+<?php
+
+return [
+    "" => "Be right back."
+];
+=======
+<?php
+
+return [
+    "" => "Be right back."
+];
+>>>>>>> dev

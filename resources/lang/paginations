@@ -1,0 +1,13 @@
+<<<<<<< HEAD
+<?php
+
+return [
+    "" => "&laquo; Previous"
+];
+=======
+<?php
+
+return [
+    "" => "&laquo; Previous"
+];
+>>>>>>> dev

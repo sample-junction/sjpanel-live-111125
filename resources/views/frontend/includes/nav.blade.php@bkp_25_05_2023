@@ -1,0 +1,249 @@
+<<<<<<< HEAD
+@push('after-styles')
+
+@endpush
+<!-- ########################### SECTION START ########################### -->
+<div class="navbar-wrapper">
+    <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+        <div class="container">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                    <span class="sr-only">{{__('frontend.nav.static.title')}}</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="{{ route('frontend.index') }}"><img style="width: 60%;" src="{{ asset('/images/logo.png') }}" class="logo-name"></a>
+            </div>
+            <div id="navbar" class="navbar-collapse collapse">
+                <ul class="nav navbar-nav navbar-right">
+                    <li><a class="page-scroll" href="#page-top">{{__('frontend.nav.static.heading_1')}}</a></li>
+                    <li><a class="page-scroll" href="#features">{{__('frontend.nav.static.heading_2')}}</a></li>
+                    <li><a class="page-scroll" href="#testimonials">{{__('frontend.nav.static.heading_3')}}</a></li>
+                    <li><a class="page-scroll" target="_blank" href="/pages/rewards">{{__('frontend.nav.static.heading_5')}}</a></li>
+                    <li><a class="page-scroll" href="#contact">{{__('frontend.nav.static.heading_4')}}</a></li>
+                    @auth
+                        <li class="hideonmobile getproposal ga-event-proposal-button-header menu-item menu-item-type-custom menu-item-object-custom">
+                            <a href="{{route('inpanel.dashboard')}}" class="getStarted btn btn-primary">{{__('frontend.nav.static.link.home')}}</a>
+                        </li>
+                    @else
+                        <li><a href="{{route('frontend.auth.login')}}">{{__('frontend.nav.static.link.login')}}</a></li>
+                        @if (config('access.registration'))
+                            <li class="hideonmobile getproposal ga-event-proposal-button-header menu-item menu-item-type-custom menu-item-object-custom">
+                                <a href="{{route('frontend.auth.register')}}" class="getStarted btn btn-primary">{{__('frontend.nav.static.link.join_now')}}</a>
+                            </li>
+                        @endif
+                    @endauth
+                    <li class="dropdown language_dropdown">
+                         <div class="blink_me_other">{{__('frontend.nav.static.binker')}} <span class="glyphicon glyphicon-arrow-right"></span></div>
+                        <a class="dropdown-toggle" id="language-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                            <i class="fas fa-globe"></i>
+                            @if(!empty($currentLanguage)) {{$currentLanguage->language_code}} @endif
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-right all_language_list" aria-labelledby="language-button" style="min-width:260px;">
+                            <li class="dropdown-header">
+                                @if(!empty($currentLanguage)) {{$currentLanguage->display_name}} - {{$currentLanguage->country->country_code}} (Selected) @endif
+                            </li>
+                            <div class="col-md-6">
+                                {{--US--}}
+                               {{-- <li role="separator" class="divider"></li> --}}
+                               {{--
+                                <li class="dropdown-header">{{__('frontend.nav.static.language_1')}}</li>
+                                <li><a class="#" href="/lang/en_US">{{__('frontend.nav.static.language_2')}}</a></li>
+                                <li><a href="/lang/es_US">{{__('frontend.nav.static.language_3')}}</a></li>
+                                --}}
+                                
+                                <li class="dropdown-header">US</li>
+                                <li><a class="#" href="/lang/en_US">{{__('ENGLISH US')}}</a></li>
+                                <li><a href="/lang/es_US">{{__('frontend.nav.static.language_spanish')}} US</a></li>
+                                
+                                {{--CA--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">CA</li>
+                                <li><a class="#" href="/lang/en_CA">{{__('ENGLISH CA')}}</a></li>
+                                <li><a class="#" href="/lang/fr_CA">{{__('frontend.nav.static.language_french')}} CA</a></li>
+
+                                {{--ES--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">ES</li>
+                                <li><a class="#" href="/lang/en_ES">{{__('ENGLISH ES')}}</a></li>
+                                <li><a class="#" href="/lang/es_ES">{{__('frontend.nav.static.language_spanish')}} ES</a></li>
+
+                                {{--DE--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">DE</li>
+                                <li><a class="#" href="/lang/en_DE">{{__('ENGLISH DE')}}</a></li>
+                                <li><a class="#" href="/lang/de_DE">{{__('frontend.nav.static.language_german')}} DE</a></li>
+
+                                {{--AU--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">AU</li>
+                                <li><a class="#" href="/lang/en_AU">{{__('ENGLISH AU')}}</a></li>
+                            </div>
+                            <div class="col-md-6">
+                                {{--UK--}}
+                                <!-- <li role="separator" class="divider"></li> -->
+                                <li class="dropdown-header">UK</li>
+                                <li><a class="#" href="/lang/en_UK">{{__('ENGLISH UK')}}</a></li>
+                                <li>&nbsp;</li>
+
+                                {{--FR--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">FR</li>
+                                <li><a class="#" href="/lang/en_FR">{{__('ENGLISH FR')}}</a></li>
+                                <li><a class="#" href="/lang/fr_FR">{{__('frontend.nav.static.language_french')}} FR</a></li>
+
+                                {{--IT--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">IT</li>
+                                <li><a class="#" href="/lang/en_IT">{{__('ENGLISH IT')}}</a></li>
+                                <li><a class="#" href="/lang/it_IT">{{__('frontend.nav.static.language_italian')}} IT</a></li>
+
+                                {{--IN--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">IN</li>
+                                <li><a class="#" href="/lang/en_IN">{{__('ENGLISH IN')}}</a></li>
+                                <li><a class="#" href="/lang/hi_IN">{{__('frontend.nav.static.language_hindi')}} IN</a></li>
+
+                                {{--CN--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">CN</li>
+                                <li><a class="#" href="/lang/en_CN">{{__('ENGLISH CN')}}</a></li>
+                                <li><a class="#" href="/lang/zh_CN">{{__('frontend.nav.static.language_chinese')}} CN</a></li>
+                                <li>&nbsp;</li>
+                            </div>
+                        </ul>
+                    </li>
+
+                </ul>
+            </div>
+        </div>
+    </nav>
+</div>
+<!-- ########################### SECTION END ########################### -->
+=======
+@push('after-styles')
+
+@endpush
+<!-- ########################### SECTION START ########################### -->
+<div class="navbar-wrapper">
+    <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+        <div class="container">
+            <div class="navbar-header page-scroll">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                    <span class="sr-only">{{__('frontend.nav.static.title')}}</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="{{ route('frontend.index') }}"><img style="width: 60%;" src="{{ asset('/images/logo.png') }}" class="logo-name"></a>
+            </div>
+            <div id="navbar" class="navbar-collapse collapse">
+                <ul class="nav navbar-nav navbar-right">
+                    <li><a class="page-scroll" href="#page-top">{{__('frontend.nav.static.heading_1')}}</a></li>
+                    <li><a class="page-scroll" href="#features">{{__('frontend.nav.static.heading_2')}}</a></li>
+                    <li><a class="page-scroll" href="#testimonials">{{__('frontend.nav.static.heading_3')}}</a></li>
+                    <li><a class="page-scroll" target="_blank" href="/pages/rewards">{{__('frontend.nav.static.heading_5')}}</a></li>
+                    <li><a class="page-scroll" href="#contact">{{__('frontend.nav.static.heading_4')}}</a></li>
+                    @auth
+                        <li class="hideonmobile getproposal ga-event-proposal-button-header menu-item menu-item-type-custom menu-item-object-custom">
+                            <a href="{{route('inpanel.dashboard')}}" class="getStarted btn btn-primary">{{__('frontend.nav.static.link.home')}}</a>
+                        </li>
+                    @else
+                        <li><a href="{{route('frontend.auth.login')}}">{{__('frontend.nav.static.link.login')}}</a></li>
+                        @if (config('access.registration'))
+                            <li class="hideonmobile getproposal ga-event-proposal-button-header menu-item menu-item-type-custom menu-item-object-custom">
+                                <a href="{{route('frontend.auth.register')}}" class="getStarted btn btn-primary">{{__('frontend.nav.static.link.join_now')}}</a>
+                            </li>
+                        @endif
+                    @endauth
+                    <li class="dropdown language_dropdown">
+                         <div class="blink_me_other">{{__('frontend.nav.static.binker')}} <span class="glyphicon glyphicon-arrow-right"></span></div>
+                        <a class="dropdown-toggle" id="language-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                            <i class="fas fa-globe"></i>
+                            @if(!empty($currentLanguage)) {{$currentLanguage->language_code}} @endif
+                            <i class="fas fa-caret-down"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-right all_language_list" aria-labelledby="language-button" style="min-width:260px;">
+                            <li class="dropdown-header">
+                                @if(!empty($currentLanguage)) {{$currentLanguage->display_name}} - {{$currentLanguage->country->country_code}} (Selected) @endif
+                            </li>
+                            <div class="col-md-6">
+                                {{--US--}}
+                               {{-- <li role="separator" class="divider"></li> --}}
+                               {{--
+                                <li class="dropdown-header">{{__('frontend.nav.static.language_1')}}</li>
+                                <li><a class="#" href="/lang/en_US">{{__('frontend.nav.static.language_2')}}</a></li>
+                                <li><a href="/lang/es_US">{{__('frontend.nav.static.language_3')}}</a></li>
+                                --}}
+                                
+                                <li class="dropdown-header">US</li>
+                                <li><a class="#" href="/lang/en_US">{{__('ENGLISH US')}}</a></li>
+                                <li><a href="/lang/es_US">{{__('frontend.nav.static.language_spanish')}} US</a></li>
+                                
+                                {{--CA--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">CA</li>
+                                <li><a class="#" href="/lang/en_CA">{{__('ENGLISH CA')}}</a></li>
+                                <li><a class="#" href="/lang/fr_CA">{{__('frontend.nav.static.language_french')}} CA</a></li>
+
+                                {{--ES--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">ES</li>
+                                <li><a class="#" href="/lang/en_ES">{{__('ENGLISH ES')}}</a></li>
+                                <li><a class="#" href="/lang/es_ES">{{__('frontend.nav.static.language_spanish')}} ES</a></li>
+
+                                {{--DE--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">DE</li>
+                                <li><a class="#" href="/lang/en_DE">{{__('ENGLISH DE')}}</a></li>
+                                <li><a class="#" href="/lang/de_DE">{{__('frontend.nav.static.language_german')}} DE</a></li>
+
+                                {{--AU--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">AU</li>
+                                <li><a class="#" href="/lang/en_AU">{{__('ENGLISH AU')}}</a></li>
+                            </div>
+                            <div class="col-md-6">
+                                {{--UK--}}
+                                <!-- <li role="separator" class="divider"></li> -->
+                                <li class="dropdown-header">UK</li>
+                                <li><a class="#" href="/lang/en_UK">{{__('ENGLISH UK')}}</a></li>
+                                <li>&nbsp;</li>
+
+                                {{--FR--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">FR</li>
+                                <li><a class="#" href="/lang/en_FR">{{__('ENGLISH FR')}}</a></li>
+                                <li><a class="#" href="/lang/fr_FR">{{__('frontend.nav.static.language_french')}} FR</a></li>
+
+                                {{--IT--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">IT</li>
+                                <li><a class="#" href="/lang/en_IT">{{__('ENGLISH IT')}}</a></li>
+                                <li><a class="#" href="/lang/it_IT">{{__('frontend.nav.static.language_italian')}} IT</a></li>
+
+                                {{--IN--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">IN</li>
+                                <li><a class="#" href="/lang/en_IN">{{__('ENGLISH IN')}}</a></li>
+                                <li><a class="#" href="/lang/hi_IN">{{__('frontend.nav.static.language_hindi')}} IN</a></li>
+
+                                {{--CN--}}
+                                <li role="separator" class="divider"></li>
+                                <li class="dropdown-header">CN</li>
+                                <li><a class="#" href="/lang/en_CN">{{__('ENGLISH CN')}}</a></li>
+                                <li><a class="#" href="/lang/zh_CN">{{__('frontend.nav.static.language_chinese')}} CN</a></li>
+                                <li>&nbsp;</li>
+                            </div>
+                        </ul>
+                    </li>
+
+                </ul>
+            </div>
+        </div>
+    </nav>
+</div>
+<!-- ########################### SECTION END ########################### -->
+>>>>>>> dev

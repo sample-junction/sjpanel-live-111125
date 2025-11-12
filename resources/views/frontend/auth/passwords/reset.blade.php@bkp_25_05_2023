@@ -1,0 +1,388 @@
+<<<<<<< HEAD
+@extends('frontend.layouts.app')
+
+@section('title', app_name() . ' | '.__('labels.frontend.passwords.reset_password_box_title'))
+
+@push('after-styles')
+    <style>
+
+        .container-login100 {
+            width: 100%;
+            min-height: 100vh;
+            display: -webkit-box;
+            display: -webkit-flex;
+            display: -moz-box;
+            display: -ms-flexbox;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+            background-position: center;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-image: url("/img/bg-01.jpg");
+        }
+        .white, .white > a{
+            color:white;
+        }
+         .field-icon {
+    float: left;
+    margin-left: 300px;
+    margin-top: -23px;
+    position: relative;
+    z-index: 2;
+}
+.text-center{
+    text-align: left !important;
+
+}
+.emsg{
+        border: 1px solid red;
+    }
+    </style>
+
+
+@endpush
+
+@section('content')
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="wrapper wrapper-content animated fadeInRight container-login100">
+                <div class="card-header">
+                </div><!--card-header-->
+                <div class="card-body">
+                    @if (session('status'))
+                        <div class="alert alert-success">
+                            {{ session('status') }}
+                        </div>
+                    @endif
+                    <div class="row">
+                        <div class="form-gap"></div>
+                        <div class="container">
+                            <div class="row">
+                                <div class="col-md-4 col-md-offset-4">
+                                    <div class="panel panel-default">
+                                        <div class="panel-body">
+                                            <div class="text-center">
+                                                <h2 class="text-center">{{__('labels.frontend.passwords.reset_password_box_title')}}</h2>
+                                                <div class="panel-body">
+                                                    {{ html()->form('POST', route('frontend.auth.password.reset'))->class('form-horizontal')->open() }}
+                                                    {{ html()->hidden('token', $token) }}
+                                                    <div class="form-group">
+                                                        <div class="input-group">
+                                                            <input id="email" name="email" placeholder="{{__('validation.attributes.frontend.email')}}" class="form-control"  value="{{$email}}" type="email" required>
+                                                            {{ html()->label(__('validation.attributes.frontend.password'))->for('password') }}
+                                                            {{ html()->password('password')
+                                                             ->class('form-control')
+                                                            ->placeholder(__('validation.attributes.frontend.password'))
+                                                            ->required() }}
+                                                            <br><br>
+                                                            <span toggle="#password" class="fa fa-fw fa-eye-slash field-icon toggle-password"></span><span style="color: red;margin-left: 0px;" id="password-msg"></span><br>
+                                                            {{ html()->label(__('validation.attributes.frontend.password_confirmation'))->for('password_confirmation') }}
+                                                            {{ html()->password('password_confirmation')
+                                                            ->class('form-control')
+                                                            ->placeholder(__('validation.attributes.frontend.password_confirmation'))
+                                                            ->required() }}<span toggle="#password_confirmation" class="fa fa-fw fa-eye-slash field-icon toggle-password-confirm"></span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <input name="submit" class="btn btn-lg btn-primary btn-block" value={{__('labels.frontend.passwords.reset_password_button')}} type="submit">
+                                                    </div>
+                                                    {{ html()->form()->close() }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div><!--row--
+                </div><!-- card-body -->
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection
+@push('after-scripts')
+<script>
+        $(document).on('click',".toggle-password",function() {
+
+  $(this).toggleClass("fa-eye fa-eye-slash");
+  var input = $($(this).attr("toggle"));
+  if (input.attr("type") == "password") {
+    input.attr("type", "text");
+  } else {
+    input.attr("type", "password");
+  }
+});
+        $(document).on('click',".toggle-password-confirm",function() {
+
+  $(this).toggleClass("fa-eye fa-eye-slash");
+  var input = $($(this).attr("toggle"));
+  if (input.attr("type") == "password") {
+    input.attr("type", "text");
+  } else {
+    input.attr("type", "password");
+  }
+});
+
+         $(document).ready(function() {
+            var flag = 0;
+    var msg = '';
+    $('.form-horizontal .form-control').blur(function() {
+
+        var info = $(this).val();
+        var id = $(this).attr('id');
+
+        if(id == 'password_confirmation' || id=='password'){
+            var pass = $("#password").val();
+            var number = /([0-9])/;
+            var alphabets = /([a-zA-Z])/;
+            var special_characters = /([~,!,@,#,$,%,^,&,*,-,_,+,=,?,>,<])/;
+            if(pass.length<8)
+            {
+                $(this).addClass('emsg');
+                $('#password-msg').html('Password should be atleast 8 characters.')
+                //$(this).show();
+                flag = 1;
+                msg += 'Weak (should be atleast 8 characters.).\n';
+                return false;
+            }else{ 
+                flag = 0;
+                $('#password-msg').html('');
+                $(this).removeClass('emsg');
+            } 
+
+            if ($('#password').val().match(number) && $('#password').val().match(alphabets) && $('#password').val().match(special_characters) && flag==0) {
+               flag = 0;
+                $(this).removeClass('emsg');
+                $('#password-msg').html('')
+        } else {
+            $(this).addClass('emsg');
+                //$(this).show();
+                  $('#password-msg').html('Password should include alphabets, numbers and special characters.')
+                flag = 1;
+                msg += 'Medium (should include alphabets, numbers and special characters or some combination.).\n';
+           
+        }
+            if(pass != info){
+                // there is a mismatch, hence show the error message
+                $(this).addClass('emsg');
+                //$(this).show();
+                flag = 1;
+                msg += 'Passwords do not match.\n';
+            }
+            else{
+                flag = 0;
+                $(this).removeClass('emsg');
+            } 
+        }
+    })
+
+    $('.form-horizontal').on('submit', function(){
+        if(flag || $('.emsg').length > 0){
+            $(':input[type="submit"]').prop('disabled', false);
+            //alert('Please provide valid input for the marked fields');
+            return false;
+        }
+        return true;
+    })
+        });
+    </script>
+=======
+@extends('frontend.layouts.app')
+
+@section('title', app_name() . ' | '.__('labels.frontend.passwords.reset_password_box_title'))
+
+@push('after-styles')
+    <style>
+
+        .container-login100 {
+            width: 100%;
+            min-height: 100vh;
+            display: -webkit-box;
+            display: -webkit-flex;
+            display: -moz-box;
+            display: -ms-flexbox;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+            background-position: center;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-image: url("/img/bg-01.jpg");
+        }
+        .white, .white > a{
+            color:white;
+        }
+         .field-icon {
+    float: left;
+    margin-left: 300px;
+    margin-top: -23px;
+    position: relative;
+    z-index: 2;
+}
+.text-center{
+    text-align: left !important;
+
+}
+.emsg{
+        border: 1px solid red;
+    }
+    </style>
+
+
+@endpush
+
+@section('content')
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="wrapper wrapper-content animated fadeInRight container-login100">
+                <div class="card-header">
+                </div><!--card-header-->
+                <div class="card-body">
+                    @if (session('status'))
+                        <div class="alert alert-success">
+                            {{ session('status') }}
+                        </div>
+                    @endif
+                    <div class="row">
+                        <div class="form-gap"></div>
+                        <div class="container">
+                            <div class="row">
+                                <div class="col-md-4 col-md-offset-4">
+                                    <div class="panel panel-default">
+                                        <div class="panel-body">
+                                            <div class="text-center">
+                                                <h2 class="text-center">{{__('labels.frontend.passwords.reset_password_box_title')}}</h2>
+                                                <div class="panel-body">
+                                                    {{ html()->form('POST', route('frontend.auth.password.reset'))->class('form-horizontal')->open() }}
+                                                    {{ html()->hidden('token', $token) }}
+                                                    <div class="form-group">
+                                                        <div class="input-group">
+                                                            <input id="email" name="email" placeholder="{{__('validation.attributes.frontend.email')}}" class="form-control"  value="{{$email}}" type="email" required>
+                                                            {{ html()->label(__('validation.attributes.frontend.password'))->for('password') }}
+                                                            {{ html()->password('password')
+                                                             ->class('form-control')
+                                                            ->placeholder(__('validation.attributes.frontend.password'))
+                                                            ->required() }}
+                                                            <br><br>
+                                                            <span toggle="#password" class="fa fa-fw fa-eye-slash field-icon toggle-password"></span><span style="color: red;margin-left: 0px;" id="password-msg"></span><br>
+                                                            {{ html()->label(__('validation.attributes.frontend.password_confirmation'))->for('password_confirmation') }}
+                                                            {{ html()->password('password_confirmation')
+                                                            ->class('form-control')
+                                                            ->placeholder(__('validation.attributes.frontend.password_confirmation'))
+                                                            ->required() }}<span toggle="#password_confirmation" class="fa fa-fw fa-eye-slash field-icon toggle-password-confirm"></span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <input name="submit" class="btn btn-lg btn-primary btn-block" value={{__('labels.frontend.passwords.reset_password_button')}} type="submit">
+                                                    </div>
+                                                    {{ html()->form()->close() }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div><!--row--
+                </div><!-- card-body -->
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection
+@push('after-scripts')
+<script>
+        $(document).on('click',".toggle-password",function() {
+
+  $(this).toggleClass("fa-eye fa-eye-slash");
+  var input = $($(this).attr("toggle"));
+  if (input.attr("type") == "password") {
+    input.attr("type", "text");
+  } else {
+    input.attr("type", "password");
+  }
+});
+        $(document).on('click',".toggle-password-confirm",function() {
+
+  $(this).toggleClass("fa-eye fa-eye-slash");
+  var input = $($(this).attr("toggle"));
+  if (input.attr("type") == "password") {
+    input.attr("type", "text");
+  } else {
+    input.attr("type", "password");
+  }
+});
+
+         $(document).ready(function() {
+            var flag = 0;
+    var msg = '';
+    $('.form-horizontal .form-control').blur(function() {
+
+        var info = $(this).val();
+        var id = $(this).attr('id');
+
+        if(id == 'password_confirmation' || id=='password'){
+            var pass = $("#password").val();
+            var number = /([0-9])/;
+            var alphabets = /([a-zA-Z])/;
+            var special_characters = /([~,!,@,#,$,%,^,&,*,-,_,+,=,?,>,<])/;
+            if(pass.length<8)
+            {
+                $(this).addClass('emsg');
+                $('#password-msg').html('Password should be atleast 8 characters.')
+                //$(this).show();
+                flag = 1;
+                msg += 'Weak (should be atleast 8 characters.).\n';
+                return false;
+            }else{ 
+                flag = 0;
+                $('#password-msg').html('');
+                $(this).removeClass('emsg');
+            } 
+
+            if ($('#password').val().match(number) && $('#password').val().match(alphabets) && $('#password').val().match(special_characters) && flag==0) {
+               flag = 0;
+                $(this).removeClass('emsg');
+                $('#password-msg').html('')
+        } else {
+            $(this).addClass('emsg');
+                //$(this).show();
+                  $('#password-msg').html('Password should include alphabets, numbers and special characters.')
+                flag = 1;
+                msg += 'Medium (should include alphabets, numbers and special characters or some combination.).\n';
+           
+        }
+            if(pass != info){
+                // there is a mismatch, hence show the error message
+                $(this).addClass('emsg');
+                //$(this).show();
+                flag = 1;
+                msg += 'Passwords do not match.\n';
+            }
+            else{
+                flag = 0;
+                $(this).removeClass('emsg');
+            } 
+        }
+    })
+
+    $('.form-horizontal').on('submit', function(){
+        if(flag || $('.emsg').length > 0){
+            $(':input[type="submit"]').prop('disabled', false);
+            //alert('Please provide valid input for the marked fields');
+            return false;
+        }
+        return true;
+    })
+        });
+    </script>
+>>>>>>> dev
+@endpush
