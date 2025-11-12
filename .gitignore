@@ -19,6 +19,11 @@ composer.lock
 /storage/*.key
 /storage/*.json
 
+# Ignore all cache and session files inside framework
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+
 # Laravel public folders
 /public/hot
 /public/storage
